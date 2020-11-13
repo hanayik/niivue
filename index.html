@@ -113,7 +113,7 @@
                 <div class="dropdown-content">
                     <a class="viewBtn" id="Open">Open</a>
                     <a class="viewBtn" id="SaveBitmap">Screen Shot</a>
-                    <a class="linker" href="https://github.com/rordenlab/MRIcroWeb">About</a>
+                    <a class="linker" href="https://github.com/neurolabusc/niivue">About</a>
                 </div>
             </li>
             <li class="dropdown">
@@ -194,6 +194,8 @@ var gl = null;
 var isDrawOnDemand = true;
 var canvas = null;
 var shader = null;
+var sliceShader = null;
+var lineShader = null;
 var blurShader = null;
 var sobelShader = null;
 var volumeTexture = null;
@@ -208,6 +210,8 @@ var projView = null;
 var newVolumeUpload = true;
 var targetFrameTime = 32;
 var samplingRate = 1.0;
+var crosshairWidth = 0.005;
+var crosshairColor =  [1, 0, 0, 1];
 var WIDTH = 320;
 var HEIGHT = 320;
 var longestAxis =  1.0;
@@ -470,68 +474,68 @@ var mydraw = function() {
 	} 
 	//Draw Axial width=x, height=y
 	//lower left quadrant (LTRB= -1,-1,0,0) is axial
-	gl.uniform1i(shader.uniforms["axCorSag"], 0);
-	gl.uniform1f(shader.uniforms["slice"], axSlice);
+	sliceShader.use();
+	gl.uniform1i(sliceShader.uniforms["axCorSag"], 0);
+	gl.uniform1f(sliceShader.uniforms["slice"], axSlice);
 	var w = volScale[0]*xAR;
 	var h = volScale[1]*yAR; 
 	axialRect = [-w, -h, w, h]
-	gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], -w, -h, w, h);
-	//gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], 1-ys, -1+ys, xs, ys); 	
+	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], -w, -h, w, h);
+	//gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], 1-ys, -1+ys, xs, ys); 	
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-
+	//draw crosshairs
+	lineShader.use();
+	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w, -h+(corSlice* h)-crosshairWidth, w, crosshairWidth);
+	gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w+(sagSlice* w)-crosshairWidth, -h, crosshairWidth, h);
+	gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 	//draw coronal  width=x, height=z
 	// upper left quadrant
-	gl.uniform1i(shader.uniforms["axCorSag"], 1);
-	gl.uniform1f(shader.uniforms["slice"], corSlice);
+	sliceShader.use();
+	gl.uniform1i(sliceShader.uniforms["axCorSag"], 1);
+	gl.uniform1f(sliceShader.uniforms["slice"], corSlice);
 	w = volScale[0]*xAR;
 	h = volScale[2]*yAR; 
 	coronalRect = [-w, 0, w, h]
-	gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], -w, 0, w, h);
+	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], -w, 0, w, h);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-
+	//draw crosshairs
+	lineShader.use();
+	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w, (axSlice* h)-crosshairWidth, w, crosshairWidth);
+	gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w+(sagSlice* w)-crosshairWidth, 0, crosshairWidth, h);
+	gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 	//draw sagital width=y, height=z
 	//  upper right quadrant
+	sliceShader.use();
 	w = volScale[1]*xAR;
 	h = volScale[2]*yAR; 
 	sagitalRect = [0, 0, w, h]
-	gl.uniform1i(shader.uniforms["axCorSag"], 2);
-	gl.uniform1f(shader.uniforms["slice"], sagSlice);
-	gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], 0, 0, w, h); 
+	gl.uniform1i(sliceShader.uniforms["axCorSag"], 2);
+	gl.uniform1f(sliceShader.uniforms["slice"], sagSlice);
+	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], 0, 0, w, h); 
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-
+	//draw crosshairs
+	lineShader.use();
+	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], 0, (axSlice* h)-crosshairWidth, w, crosshairWidth);
+	gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], (corSlice* w)-crosshairWidth, 0, crosshairWidth, h);
+	gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 }
+
 function glDraw() {
-	gl.uniform1f(shader.uniforms["dt_scale"], samplingRate);
 	gl.clearColor(0.0, 0.0, 0.0, 0.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
 
 	if (is2D) { //show 2D slices not rendering
-		//todo: set proportional scale for slices, choose slice position
-		//our viewport is [-1, -1, 1, 1]: e.g. 0,0 is screen center
-		//Pixel sizes are
-		// 	WIDTH = canvas.clientWidth;
-  		//  HEIGHT = canvas.clientHeight;//menuHeight;
-  		//Pixel sizes are
-		//WIDTH = canvas.clientWidth;
-  		//HEIGHT = canvas.clientHeight;//menuHeight;
-		/* console.log(WIDTH, HEIGHT) */
-		//OrthoPix2Frac (from mricroGL)
-		//OrthoCoordMidSlice (from mricroGL)
-		//FracToSlice (from mricroGL)
-  		//Proportional size of volumes is stored in VolScale
-  		//var volScale = [hdr.dims[1] / longestAxis, hdr.dims[2] / longestAxis,hdr.dims[3] / longestAxis];
-		
-		
-		/* var y = mouseY/HEIGHT
-		console.log(y) */
-		/* console.log("xAR ",xAR) */
-		/* console.log("yAR ", yAR) */
 		hWIDTH = Math.round(WIDTH/2) // half width
 		hHEIGHT = Math.round(HEIGHT/2) // half height
-		// [x1, y1, x2, y2]
-		/* var sagitalRect = [hWIDTH, 0, WIDTH, hHEIGHT]
-		var axialRect = [0, hHEIGHT, hWIDTH, HEIGHT]
-		var coronalRect = [0, 0, hWIDTH, hHEIGHT] */
 		var clipX = mouseX / gl.canvas.clientWidth  * 2 - 1;    
 		var clipY = mouseY / gl.canvas.clientHeight * -2 + 1;
 		/* console.log(clipX, clipY) */
@@ -553,6 +557,8 @@ function glDraw() {
 		
 		
 	} else {
+		sliceShader.use();
+		gl.uniform1f(shader.uniforms["dt_scale"], samplingRate);
 		projView = mat4.mul(projView, proj, camera.camera);
 		gl.uniformMatrix4fv(shader.uniforms["normal_matrix"], false, camera.camera);
 		gl.uniformMatrix4fv(shader.uniforms["proj_view"], false, projView);
@@ -797,6 +803,12 @@ window.onload = function(){
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cubeStrip), gl.STATIC_DRAW);
 	gl.enableVertexAttribArray(0);
 	gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+	//sliceShader handles 2D slices: axial, coronal, sagittal
+	sliceShader = new Shader(vertSliceShader, fragSliceShader);
+	sliceShader.use();
+	//line shader draws cross-hairs
+	lineShader = new Shader(vertLineShader, fragLineShader); 
+	lineShader.use();
 	sobelShader = new Shader(blurVertShader, sobelFragShader);
 	sobelShader.use();
 	blurShader = new Shader(blurVertShader, blurFragShader);
@@ -820,9 +832,13 @@ window.onload = function(){
 function setShader(shaderInt) { //0=default, 1=lighting, 2=Maximum Intensity
 	is2D = false;
 	if (shaderInt >= 5) {
-		shader = new Shader(vertShader2D, fragShader2D);
+		//shader = new Shader(vertShader2D, fragShader2D);
+		sliceShader.use();
+		gl.uniform1i(sliceShader.uniforms["volume"], 0);
+		gl.uniform1i(sliceShader.uniforms["colormap"], 1);
 		is2D = true;
-	} else if (shaderInt === 4)
+	}
+	if (shaderInt === 4)
 		shader = new Shader(vertShader, fragShaderMatCap);
 	else if (shaderInt === 3)
 		shader = new Shader(vertShader, fragShaderGradients);

@@ -429,7 +429,7 @@ void main(void) {
 	}
 }`;
 
-var vertShader2D =
+var vertSliceShader =
 `#version 300 es
 #line 434
 layout(location=0) in vec3 pos;
@@ -449,7 +449,7 @@ void main(void) {
 		texPos = vec3(pos.xy, slice);
 }`;
 
-var fragShader2D =
+var fragSliceShader =
 `#version 300 es
 #line 456
 precision highp int;
@@ -464,4 +464,27 @@ void main() {
     float val = texture(volume, texPos).r;
 	//color = texture(colormap, vec2(val, 0.5)); //apply color scheme, use texture Alpha
 	color = vec4(texture(colormap, vec2(val, 0.5)).rgb, 1.0); //apply color scheme, use texture Alpha	
+}`;
+
+var vertLineShader =
+`#version 300 es
+#line 434
+layout(location=0) in vec3 pos;
+uniform vec4 leftBottomWidthHeight;
+void main(void) {
+	gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
+	gl_Position.x = leftBottomWidthHeight.x + (pos.x * leftBottomWidthHeight.b);
+	gl_Position.y = leftBottomWidthHeight.y + (pos.y * leftBottomWidthHeight.a);
+}`;
+
+var fragLineShader =
+`#version 300 es
+#line 456
+precision highp int;
+precision highp float;
+uniform vec4 lineColor;
+out vec4 color;
+void main() {
+	color = lineColor;
+	//color = vec4(1.0, 0.0, 0.0, 1.0);	
 }`;
