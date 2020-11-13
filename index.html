@@ -167,7 +167,7 @@
                 <div class="dropdown-content">
                     <a class="viewBtn" id="_spm152.nii.gz">spm</a>
                     <a class="viewBtn" id="_Chris_MRA.nii.gz">MRA</a>
-                    <a class="viewBtn" id="_Chris_T1.nii.gz">T1</a>
+                    <a class="viewBtn" id="_zChris_T1.nii.gz">T1</a>
                 </div>
             </li>
         </ul>
@@ -183,14 +183,9 @@
 <script src="volume/FileSaver.js"></script>
 <script>
 //https://stackoverflow.com/questions/21286887/adding-check-marks-to-bootstrap-button-drop-down-items
-
-//var cubeStrip = [1,1,0, 0,1,0, 1,1,1, 0,1,1, 0,0,1, 0,1,0, 0,0,0, 1,1,0, 1,0,0, 1,1,1, 1,0,1, 0,0,1, 1,0,0, 0,0,0];
 var takeScreenShot = false;
 var is2D = false;
 var cubeStrip = [0,1,0, 1,1,0, 0,1,1, 1,1,1, 1,0,1, 1,1,0, 1,0,0, 0,1,0, 0,0,0, 0,1,1, 0,0,1, 1,0,1, 0,0,0, 1,0,0];
-//
-//var cubeStrip = [0,0,0,  0,1,0,  1,0,0,  1,1,0,  1,1,1,  0,1,0,  0,1,1,  0,0,1,  1,1,1,  1,0,1   1,0,0,  0,0,1,  0,0,0,  0,1,0];
-
 var mouseX = null;
 var mouseY = null;
 var container = null;
@@ -215,6 +210,13 @@ var targetFrameTime = 32;
 var samplingRate = 1.0;
 var WIDTH = 320;
 var HEIGHT = 320;
+var longestAxis =  1.0;
+var volScale = [1, 1, 1];
+var xAR = 1.0
+var yAR = 1.0
+var sagitalRect = [0, 0, 0, 0]
+var coronalRect = [0, 0, 0, 0]
+var axialRect = [0, 0, 0 , 0]
 canvas = document.getElementById("glcanvas");
 var cRect = canvas.getBoundingClientRect();
 var clickNdrag = function (e) {
@@ -225,10 +227,9 @@ var clickNdrag = function (e) {
 	if (shiftPressed) {
 		mouseX = Math.round(e.clientX - cRect.left);  // Subtract the 'left' of the canvas 
 		mouseY = Math.round(e.clientY - cRect.top);   // from the X/Y positions to make  
-		console.log(mouseX, mouseY)
+		//console.log("mouse", mouseX, mouseY)
 		glDraw();
-	}
-	
+	}	
 }
 canvas.addEventListener("mousemove", clickNdrag)
 
@@ -450,41 +451,54 @@ var axSlice = 0.5
 var corSlice = 0.5
 var sagSlice = 0.5
 var isInRect = function(x,y,rect) {
-	var isin = x>rect[0] && x < rect[2] && y > rect[1] && y < rect[3]
-	console.log(rect)
-	console.log(x, y)
-	console.log(isin)
+	var isin = x>rect[0] && x < rect[2]+rect[0] && y > rect[1] && y < rect[3]+rect[1]
+	/* console.log(rect) */
+	/* console.log(isin) */
 	return isin
 }
+
 var mydraw = function() {
 	canvas.style.backgroundColor = "black"
-	var longestAxis = Math.max(hdr.dims[1], Math.max(hdr.dims[2], hdr.dims[3]));
-	var volScale = [hdr.dims[1] / longestAxis, hdr.dims[2] / longestAxis,hdr.dims[3] / longestAxis];
-	//draw axial
-	var xs = volScale[0]
-	var ys = volScale[1]
-	var zs = volScale[2]
-
-	WIDTH = canvas.clientWidth;
-  	HEIGHT = canvas.clientHeight;//menuHeight;
-	
+	/* gl.viewport(0, 0, gl.canvas.width, gl.canvas.height); */
+	//WIDTH = canvas.clientWidth;
+  	//HEIGHT = canvas.clientHeight;//menuHeight;
+	xAR = HEIGHT/WIDTH;
+	yAR = 1.0;
+	if (xAR > 1.0) {
+		yAR = WIDTH/HEIGHT;
+		xAR =  1.0;
+	} 
+	//Draw Axial width=x, height=y
+	//lower left quadrant (LTRB= -1,-1,0,0) is axial
 	gl.uniform1i(shader.uniforms["axCorSag"], 0);
 	gl.uniform1f(shader.uniforms["slice"], axSlice);
-	//gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], 0.0, 0.0, 1, 1);
-	gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], 1-ys, -1+ys, xs, ys); 	
+	var w = volScale[0]*xAR;
+	var h = volScale[1]*yAR; 
+	axialRect = [-w, -h, w, h]
+	gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], -w, -h, w, h);
+	//gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], 1-ys, -1+ys, xs, ys); 	
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-	//draw coronal
+
+	//draw coronal  width=x, height=z
+	// upper left quadrant
 	gl.uniform1i(shader.uniforms["axCorSag"], 1);
 	gl.uniform1f(shader.uniforms["slice"], corSlice);
-	//gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], -1, -1, 1, 1);
-	gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], -1, 1-zs*2, xs, zs); 	
+	w = volScale[0]*xAR;
+	h = volScale[2]*yAR; 
+	coronalRect = [-w, 0, w, h]
+	gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], -w, 0, w, h);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-	//draw sagital
+
+	//draw sagital width=y, height=z
+	//  upper right quadrant
+	w = volScale[1]*xAR;
+	h = volScale[2]*yAR; 
+	sagitalRect = [0, 0, w, h]
 	gl.uniform1i(shader.uniforms["axCorSag"], 2);
 	gl.uniform1f(shader.uniforms["slice"], sagSlice);
-	//gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], -1, 0.0, 1, 1); 	
-	gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], -1, 1-zs, ys, zs); 
+	gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], 0, 0, w, h); 
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+
 }
 function glDraw() {
 	gl.uniform1f(shader.uniforms["dt_scale"], samplingRate);
@@ -498,8 +512,8 @@ function glDraw() {
 		// 	WIDTH = canvas.clientWidth;
   		//  HEIGHT = canvas.clientHeight;//menuHeight;
   		//Pixel sizes are
-		WIDTH = canvas.clientWidth;
-  		HEIGHT = canvas.clientHeight;//menuHeight;
+		//WIDTH = canvas.clientWidth;
+  		//HEIGHT = canvas.clientHeight;//menuHeight;
 		/* console.log(WIDTH, HEIGHT) */
 		//OrthoPix2Frac (from mricroGL)
 		//OrthoCoordMidSlice (from mricroGL)
@@ -510,22 +524,30 @@ function glDraw() {
 		
 		/* var y = mouseY/HEIGHT
 		console.log(y) */
-		
+		/* console.log("xAR ",xAR) */
+		/* console.log("yAR ", yAR) */
 		hWIDTH = Math.round(WIDTH/2) // half width
 		hHEIGHT = Math.round(HEIGHT/2) // half height
 		// [x1, y1, x2, y2]
-		var axialRect = [hWIDTH, 0, WIDTH, hHEIGHT]
-		var coronalRect = [0, hHEIGHT, hWIDTH, HEIGHT]
-		var sagitalRect = [0, 0, hWIDTH, hHEIGHT]
-		if (isInRect(mouseX, mouseY, axialRect)) {
-			sagSlice = (mouseX-hWIDTH)/hWIDTH
-			corSlice = 1-mouseY/hHEIGHT
-		} else if (isInRect(mouseX, mouseY, coronalRect)) {
-			sagSlice = mouseX/hWIDTH
-			axSlice = 1-(mouseY-hHEIGHT)/hHEIGHT
-		} else if (isInRect(mouseX, mouseY, sagitalRect)) {
-			corSlice = mouseX/hWIDTH
-			axSlice = 1-mouseY/hHEIGHT
+		/* var sagitalRect = [hWIDTH, 0, WIDTH, hHEIGHT]
+		var axialRect = [0, hHEIGHT, hWIDTH, HEIGHT]
+		var coronalRect = [0, 0, hWIDTH, hHEIGHT] */
+		var clipX = mouseX / gl.canvas.clientWidth  * 2 - 1;    
+		var clipY = mouseY / gl.canvas.clientHeight * -2 + 1;
+		/* console.log(clipX, clipY) */
+		if (isInRect(clipX, clipY, axialRect)) {
+			sagSlice = 1 - clipX / axialRect[2]+axialRect[1]//(mouseX-hWIDTH)/hWIDTH
+			//leftBottomWidthHeight
+			//  0    1    2    3
+			// THIS WORKS (ONLY TESTING AXIAL FOR NOW)
+			corSlice = 1 - clipY / axialRect[1] //1-mouseY/hHEIGHT
+			console.log(corSlice)
+		} else if (isInRect(clipX, clipY, coronalRect)) {
+			/* sagSlice = mouseX/hWIDTH */
+			/* axSlice = 1-(mouseY-hHEIGHT)/hHEIGHT */
+		} else if (isInRect(clipX, clipY, sagitalRect)) {
+			/* corSlice = mouseX/hWIDTH */
+			/* axSlice = 1-mouseY/hHEIGHT */
 		}
 		mydraw()
 		
@@ -597,8 +619,10 @@ function updateVolume() { //load volume or change contrast
 	gl.pixelStorei( gl.UNPACK_ALIGNMENT, 1 )
 	gl.texStorage3D(gl.TEXTURE_3D, 1, gl.R8, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
 	gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0,hdr.dims[1], hdr.dims[2], hdr.dims[3],gl.RED, gl.UNSIGNED_BYTE, img8);
-	var longestAxis = Math.max(hdr.dims[1], Math.max(hdr.dims[2], hdr.dims[3]));
-	var volScale = [hdr.dims[1] / longestAxis, hdr.dims[2] / longestAxis,hdr.dims[3] / longestAxis];
+	var dims = [1.0, hdr.dims[1]*hdr.pixDims[1], hdr.dims[2]*hdr.pixDims[2],  hdr.dims[3]*hdr.pixDims[3]];
+	//var dims = [1.0, hdr.dims[1]*hdr.pixdim[1], hdr.dims[2]*hdr.pixdim[2], hdr.dims[3]*hdr.pixdim[3]];
+	longestAxis = Math.max(dims[1], Math.max(dims[2], dims[3]));
+	volScale = [dims[1] / longestAxis, dims[2] / longestAxis, dims[3] / longestAxis];
 	gl.uniform3iv(shader.uniforms["volume_dims"], [hdr.dims[1],hdr.dims[2],hdr.dims[3]]);
 	gl.uniform3fv(shader.uniforms["volume_scale"], volScale);
 	newVolumeUpload = true;

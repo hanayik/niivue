@@ -463,6 +463,5 @@ void main() {
     //color = texture(volume, texPos); //show color index
     float val = texture(volume, texPos).r;
 	//color = texture(colormap, vec2(val, 0.5)); //apply color scheme, use texture Alpha
-	color = vec4(texture(colormap, vec2(val, 0.5)).rgb, 1.0); //apply color scheme, use texture Alpha
-	
+	color = vec4(texture(colormap, vec2(val, 0.5)).rgb, 1.0); //apply color scheme, use texture Alpha	
 }`;
