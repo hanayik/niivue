@@ -303,6 +303,7 @@ function adjustQuality(scale) {
 	samplingRate = samplingRate * scale;
 	samplingRate = Math.min(samplingRate, 10.0);
 	samplingRate = Math.max(samplingRate, 0.7);
+	shader.use();
 	gl.uniform1f(shader.uniforms["dt_scale"], samplingRate);
 	console.log('quality ', samplingRate);
 	if (isDrawOnDemand) glDraw();
@@ -532,8 +533,9 @@ var mydraw = function() {
 function glDraw() {
 	gl.clearColor(0.0, 0.0, 0.0, 0.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
-
+	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 	if (is2D) { //show 2D slices not rendering
+	
 		hWIDTH = Math.round(WIDTH/2) // half width
 		hHEIGHT = Math.round(HEIGHT/2) // half height
 		var clipX = mouseX / gl.canvas.clientWidth  * 2 - 1;    
@@ -554,10 +556,10 @@ function glDraw() {
 			/* axSlice = 1-mouseY/hHEIGHT */
 		}
 		mydraw()
-		
-		
-	} else {
-		sliceShader.use();
+		gl.viewport(gl.canvas.width/2, 0, gl.canvas.width/2, gl.canvas.height/2);
+	//} else {
+	} if (true) {
+		shader.use();
 		gl.uniform1f(shader.uniforms["dt_scale"], samplingRate);
 		projView = mat4.mul(projView, proj, camera.camera);
 		gl.uniformMatrix4fv(shader.uniforms["normal_matrix"], false, camera.camera);
@@ -576,9 +578,7 @@ function glDraw() {
 		light[2] = eye[2] + up[2] * mx;
 		gl.uniform3fv(shader.uniforms["light_pos"], light);
 		//draw cube
-		
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, cubeStrip.length / 3);
-	
 	}
 	// Wait for rendering to actually finish
 	gl.finish();
@@ -648,6 +648,7 @@ function updateVolume() { //load volume or change contrast
 				if (newVolumeUpload) {
 					onWindowResize();
 					samplingRate = 1.0;
+					shader.use();
 					gl.uniform1f(shader.uniforms["dt_scale"], samplingRate);
 				}
 				glDraw();
@@ -661,6 +662,7 @@ function updateVolume() { //load volume or change contrast
 				// If we're dropping frames, decrease the sampling rate
 				if (!newVolumeUpload && targetSamplingRate > samplingRate) {
 					samplingRate = 0.8 * samplingRate + 0.2 * targetSamplingRate;
+					shader.use();
 					gl.uniform1f(shader.uniforms["dt_scale"], samplingRate);
 				}
 				newVolumeUpload = false;
@@ -813,7 +815,8 @@ window.onload = function(){
 	sobelShader.use();
 	blurShader = new Shader(blurVertShader, blurFragShader);
 	blurShader.use();
-	setShader(5); //Matcap shader
+	setShader(4); //Matcap shader
+	setShader(5); //Slices Shader
 	// Setup required OpenGL state for drawing the back faces and
 	// composting with the background color
 	gl.enable(gl.CULL_FACE);
@@ -846,7 +849,7 @@ function setShader(shaderInt) { //0=default, 1=lighting, 2=Maximum Intensity
 		shader = new Shader(vertShader, fragShaderMIP);
 	else if (shaderInt === 1)
 		shader = new Shader(vertShader, fragShaderLighting);
-	else
+	else if (shaderInt != 5)
 		shader = new Shader(vertShader, fragShader);
 	shader.use();
 	gl.uniform1i(shader.uniforms["volume"], 0);
@@ -867,7 +870,8 @@ function onWindowResize(isInit = false) {
     	//console.log("<< %s  %s", WIDTH, HEIGHT);
   	}
 	//https://webglfundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html
-	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+	//gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+	//gl.viewport(gl.canvas.width/2, 0, gl.canvas.width, gl.canvas.height/2);
 	proj = mat4.perspective(mat4.create(), 15 * Math.PI / 180.0,WIDTH / HEIGHT, 0.1, 100);
 	camera = new ArcballCamera(center, 2, [WIDTH, HEIGHT]);
 	projView = mat4.create();
