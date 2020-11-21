@@ -313,7 +313,7 @@ function adjustOpacity(scale) {
 	colorOpacity = colorOpacity * scale;
 	colorOpacity = Math.min(colorOpacity, 10.0);
 	colorOpacity = Math.max(colorOpacity, 0.1);
-	selectColormap(colorName);
+	/* selectColormap(colorName); */
 	console.log('opacity ', colorOpacity);
 	if (isDrawOnDemand) glDraw();
 } // adjustOpacity()
@@ -321,21 +321,22 @@ function adjustOpacity(scale) {
 var loadVolume = function(url, isURL, onload) {
 	if (!isURL) {
 		var reader = new FileReader();
-        	reader.readAsArrayBuffer(url);
-            reader.addEventListener('load', function(event) {
-            	console.log(event.target.result);
-            	//loadGeometryCore(object, isOverlay);
-            	var hdr = nifti.readHeader(event.target.result);
-				var img;
-				if  (nifti.isCompressed(event.target.result)) {
-					img = nifti.readImage(hdr, nifti.decompress(event.target.result));
-				} else
-					img = nifti.readImage(hdr, event.target.result);
+    reader.readAsArrayBuffer(url);
+    reader.addEventListener('load', function(event) {
+      console.log(event.target.result);
+      //loadGeometryCore(object, isOverlay);
+      var hdr = nifti.readHeader(event.target.result);
+			var img;
+			if  (nifti.isCompressed(event.target.result)) {
+				img = nifti.readImage(hdr, nifti.decompress(event.target.result));
+			} else
+				img = nifti.readImage(hdr, event.target.result);
 				//img = new Uint8Array(img);
 				onload(url, hdr, img);
 
-            });
-        return;
+    	}
+		);
+    return;
 	}
 	var req = new XMLHttpRequest();
 	req.open("GET", url, true);
@@ -379,6 +380,7 @@ function bindBlankGL() {
 } // bindBlankGL()
 
 function gradientGL() {
+	console.log("gradientGL")
 	var faceStrip = [0,0,0, 0,1,0, 1,0,0, 1,1,0];
 	var vao2 = gl.createVertexArray();
 	gl.bindVertexArray(vao2);
@@ -392,7 +394,7 @@ function gradientGL() {
 	gl.disable(gl.CULL_FACE);
 	gl.viewport(0, 0, hdr.dims[1], hdr.dims[2]);
 	gl.disable(gl.BLEND);
- 	tempTex3D = bindBlankGL();
+ 	/* tempTex3D = bindBlankGL(); */
 	blurShader.use();
 	gl.activeTexture(gl.TEXTURE1);
 	gl.bindTexture(gl.TEXTURE_3D, tex);
@@ -674,7 +676,7 @@ function updateVolume() { //load volume or change contrast
 		volumeTexture = tex;
 		if (isDrawOnDemand) glDraw();
 	}
-	gradientGL();
+	/* gradientGL(); */
 	glDraw();
 } // updateVolume()
 
@@ -826,7 +828,7 @@ window.onload = function(){
 	//gl.clearColor(1, 0.5, 0.5, 3);
 	// Load the default colormap and upload it, after which we
 	// load the default volume.
-	selectJpeg('0.jpg')
+	/* selectJpeg('0.jpg') */
 	selectColormap("Gray");
 	//selectVolume("spmSmall.nii.gz");
 	selectVolume("spm152.nii.gz");
@@ -872,12 +874,12 @@ function onWindowResize(isInit = false) {
 	//https://webglfundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html
 	//gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 	//gl.viewport(gl.canvas.width/2, 0, gl.canvas.width, gl.canvas.height/2);
-	proj = mat4.perspective(mat4.create(), 15 * Math.PI / 180.0,WIDTH / HEIGHT, 0.1, 100);
-	camera = new ArcballCamera(center, 2, [WIDTH, HEIGHT]);
-	projView = mat4.create();
-	const kRot = Math.sqrt(0.5);
-    camera.rotateY([0.0,kRot]);
-    camera.rotateY([kRot,0.0]);
+	/* proj = mat4.perspective(mat4.create(), 15 * Math.PI / 180.0,WIDTH / HEIGHT, 0.1, 100); */
+	/* camera = new ArcballCamera(center, 2, [WIDTH, HEIGHT]); */
+	/* projView = mat4.create(); */
+	/* const kRot = Math.sqrt(0.5); */
+    /* camera.rotateY([0.0,kRot]); */
+    /* camera.rotateY([kRot,0.0]); */
 	//if (isInit) return;
 	//samplingRate = 1.0;
 	//gl.uniform1f(shader.uniforms["dt_scale"], samplingRate);
