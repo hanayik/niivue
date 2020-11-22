@@ -1,5 +1,10 @@
 // import * as glmat from "gl-matrix"
 import * as nii from "nifti-reader-js"
+import { Shader } from "./webgl-util/shader.js";
+import { vertSliceShader, fragSliceShader } from "./shader-srcs.js";
+
+var colormapTexture = null
+var volumeTexture = null
 
 export function loadVolume(url, volume) {
 	var hdr = null
@@ -34,15 +39,28 @@ export function loadVolume(url, volume) {
 	return
 }
 
-export function updateGLVolume(gl, shader, volume) { //load volume or change contrast
-	//convert data to 8-bit image
-	
+export function updateGLVolume(gl, volume) { //load volume or change contrast
+	var cubeStrip = [0,1,0, 1,1,0, 0,1,1, 1,1,1, 1,0,1, 1,1,0, 1,0,0, 0,1,0, 0,0,0, 0,1,1, 0,0,1, 1,0,1, 0,0,0, 1,0,0];
+	var vao = gl.createVertexArray();
+	gl.bindVertexArray(vao);
+	var vbo = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cubeStrip), gl.STATIC_DRAW);
+	gl.enableVertexAttribArray(0);
+	gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+	selectColormap(gl, "gray")
+	var shader = new Shader(gl, vertSliceShader, fragSliceShader);
+	shader.use(gl)
+	var samplingRate = 1.0;
+	gl.uniform1f(shader.uniforms["dt_scale"], samplingRate);
+	gl.uniform1i(shader.uniforms["volume"], 0);
+	gl.uniform1i(shader.uniforms["colormap"], 1);
 	var hdr = volume.hdr
 	var img = volume.img
 	// console.log(hdr)
-	var vox = hdr.dims[1] * hdr.dims[2] * hdr.dims[3];
-	var img8 = new Uint8Array(vox);
-	var imgRaw = new Uint8Array(img)
+	// var vox = hdr.dims[1] * hdr.dims[2] * hdr.dims[3];
+
+	var imgRaw = null
 	if (hdr.datatypeCode === 2) //data already uint8
 		imgRaw = new Uint8Array(img);
 	else if (hdr.datatypeCode === 4)
@@ -51,11 +69,38 @@ export function updateGLVolume(gl, shader, volume) { //load volume or change con
 		imgRaw = new Float32Array(img);
 	else if (hdr.datatypeCode === 512)
 		imgRaw = new Uint16Array(img);
-	var mn = hdr.cal_min;
-	var mx = hdr.cal_max;
+	// var mn = hdr.cal_min;
+	// var mx = hdr.cal_max;
+	var vox = imgRaw.length;
+	var mn = Infinity;
+	var mx = -Infinity;
+	var i
+	for (i = 0; i < (vox-1); i++) {
+		if (!isFinite(imgRaw[i])) continue;
+		if (imgRaw[i] < mn) mn = imgRaw[i];
+		if (imgRaw[i] > mx) mx = imgRaw[i];
+	}
+	//calibrate intensity
+	if ((isFinite(hdr.scl_slope)) && (isFinite(hdr.scl_inter)) && (hdr.scl_slope !== 0.0 )) {
+		//console.log(">> mn %f mx %f %f %f", mn, mx, hdr.scl_slope, hdr.scl_inter);
+		mn = (mn * hdr.scl_slope) + hdr.scl_inter;
+		mx = (mx * hdr.scl_slope) + hdr.scl_inter;
+	} else {
+		hdr.scl_slope = 1.0;
+		hdr.scl_inter = 0.0;
+	}
+	//console.log("vx %d type %d mn %f mx %f", vox, hdr.datatypeCode, mn, mx);
+	//console.log("cal mn..mx %f..%f", hdr.cal_min, hdr.cal_max);
+	hdr.global_min = mn;
+	hdr.global_max = mx;
+	if ((!isFinite(hdr.cal_min)) || (!isFinite(hdr.cal_max)) || (hdr.cal_min >= hdr.cal_max)) {
+		hdr.cal_min = mn;
+		hdr.cal_max = mx;
+	}
+	var img8 = new Uint8Array(vox);
 	var scale = 1;
-	if (mx > mn) scale = 255 / (mx-mn);
-	for (var i = 0; i < (vox-1); i++) {
+	if (mx > mn) scale = 255 / (mx - mn);
+	for (i = 0; i < (vox - 1); i++) {
 		var v = imgRaw[i];
 		v = (v * hdr.scl_slope) + hdr.scl_inter;
 		if (v < mn)
@@ -63,8 +108,9 @@ export function updateGLVolume(gl, shader, volume) { //load volume or change con
 		else if (v > mx)
 			img8[i] = 255;
 		else
-			img8[i] = (v-mn) * scale;
+			img8[i] = (v - mn) * scale;
 	}
+	// console.log(img8)
 	var tex = gl.createTexture();
 	gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_3D, tex);
@@ -73,30 +119,23 @@ export function updateGLVolume(gl, shader, volume) { //load volume or change con
 	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
 	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-	gl.pixelStorei( gl.UNPACK_ALIGNMENT, 1 )
-	gl.texStorage3D(gl.TEXTURE_3D, 1, gl.R8, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
-	gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0,hdr.dims[1], hdr.dims[2], hdr.dims[3],gl.RED, gl.UNSIGNED_BYTE, img8);
-	// var dims = [1.0, hdr.dims[1]*hdr.pixDims[1], hdr.dims[2]*hdr.pixDims[2],  hdr.dims[3]*hdr.pixDims[3]];
-	// var longestAxis = Math.max(dims[1], Math.max(dims[2], dims[3]));
-	// var volScale = [dims[1] / longestAxis, dims[2] / longestAxis, dims[3] / longestAxis];
-	// shader.use(gl)
-	// gl.uniform3iv(shader.uniforms["volume_dims"], [hdr.dims[1],hdr.dims[2],hdr.dims[3]]);
-	// gl.uniform3fv(shader.uniforms["volume_scale"], volScale);
-	// drawSlices(gl, shader, hdr,0.5, 0.5, 0.5)
-} // updateVolume()
-
-export function bindBlankGL(gl, hdr) {
-	let texR = gl.createTexture();
-	gl.bindTexture(gl.TEXTURE_3D, texR);
-	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
-	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 	gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
-	gl.texStorage3D(gl.TEXTURE_3D, 1, gl.RGBA8, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
-	return texR;
-}
+	gl.texStorage3D(gl.TEXTURE_3D, 1, gl.R8, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
+	gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], gl.RED, gl.UNSIGNED_BYTE, img8);
+	var dims = [1.0, hdr.dims[1] * hdr.pixDims[1], hdr.dims[2] * hdr.pixDims[2], hdr.dims[3] * hdr.pixDims[3]];
+	var longestAxis = Math.max(dims[1], Math.max(dims[2], dims[3]));
+	var volScale = [dims[1] / longestAxis, dims[2] / longestAxis, dims[3] / longestAxis];
+	if (!volumeTexture) {
+		volumeTexture = tex;
+	} else {
+		gl.deleteTexture(volumeTexture);
+		volumeTexture = tex;
+	}
+	shader.use(gl)
+	gl.uniform3iv(shader.uniforms["volume_dims"], [hdr.dims[1], hdr.dims[2], hdr.dims[3]]);
+	gl.uniform3fv(shader.uniforms["volume_scale"], volScale);
+	drawSlices(gl, shader, volume, 0.5, 0.5, 0.5)
+} // updateVolume()
 
 export function byteBound(flt) { //return range 0..255
 	var ret = Math.min(flt, 255);
@@ -111,7 +150,9 @@ export function selectColormap(gl, lutName = "") {
 		lut = makeLut([68, 49, 53, 253], [1, 104, 183, 231], [84, 142, 121, 37], [0, 56, 80, 88], [0, 65, 192, 255]);//viridis
 	if (lutName === "Inferno")
 		lut = makeLut([0, 120, 237, 240], [0, 28, 105, 249], [4, 109, 37, 33], [0, 56, 80, 88], [0, 64, 192, 255]);//inferno
-	var colormapTexture = gl.createTexture();
+	if (colormapTexture !== null)
+		gl.deleteTexture(colormapTexture);
+	colormapTexture = gl.createTexture();
 	gl.activeTexture(gl.TEXTURE1);
 	gl.bindTexture(gl.TEXTURE_2D, colormapTexture);
 	gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, 256, 1);
@@ -119,6 +160,7 @@ export function selectColormap(gl, lutName = "") {
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 	gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 256, 1, gl.RGBA, gl.UNSIGNED_BYTE, lut);
+	console.log("set colormap")
 } // selectColormap()
 
 export function makeLut(Rs, Gs, Bs, As, Is) {
@@ -144,25 +186,32 @@ export function makeLut(Rs, Gs, Bs, As, Is) {
 			k++;
 		}
 	}
+	console.log(lut)
 	return lut;
 } // makeLut()
 
 
-export function drawSlices(gl, shader, hdr, a, c, s) {
+export function drawSlices(gl, shader, volume, a, c, s) {
+	var hdr = volume.hdr
 	console.log("drawing slices")
 	gl.clearColor(0.0, 0.0, 0.0, 0.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
+	console.log("viewport width ", gl.canvas.width)
+	console.log("viewport height ", gl.canvas.height)
 	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-	var dims = [1.0, hdr.dims[1]*hdr.pixDims[1], hdr.dims[2]*hdr.pixDims[2],  hdr.dims[3]*hdr.pixDims[3]];
+	var dims = [1.0, hdr.dims[1] * hdr.pixDims[1], hdr.dims[2] * hdr.pixDims[2], hdr.dims[3] * hdr.pixDims[3]];
 	var longestAxis = Math.max(dims[1], Math.max(dims[2], dims[3]));
 	var volScale = [dims[1] / longestAxis, dims[2] / longestAxis, dims[3] / longestAxis];
-	// gl.canvas.style.backgroundColor = "black"
+	console.log("volScale", volScale)
+	gl.canvas.style.backgroundColor = "black"
 	var xAR = gl.canvas.clientHeight / gl.canvas.clientWidth;
 	var yAR = 1.0;
 	if (xAR > 1.0) {
 		yAR = gl.canvas.clientWidth / gl.canvas.clientHeight;
 		xAR = 1.0;
 	}
+	console.log("xAR ", xAR)
+	console.log("yAR ", yAR)
 
 	var w = volScale[0] * xAR;
 	var h = volScale[1] * yAR;

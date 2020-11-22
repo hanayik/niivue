@@ -5,8 +5,8 @@
 </template>
 <script>
 import * as nv from "../niivue.js";
-import { Shader } from "../webgl-util/shader.js";
-import { vertSliceShader, fragSliceShader } from "../shader-srcs.js";
+// import { Shader } from "../webgl-util/shader.js";
+// import { vertSliceShader, fragSliceShader } from "../shader-srcs.js";
 
 export default {
   name: "NiiVue",
@@ -34,18 +34,17 @@ export default {
     "volume.hdr": function (val) {
       console.log(val);
 
-      nv.bindBlankGL(this.gl, this.volume.hdr)
-      
-      nv.updateGLVolume(this.gl, this.sliceShader, this.volume);
-      this.sliceShader.use(this.gl)
-      nv.selectColormap(this.gl)
-      
-      var samplingRate = 1.0;
-			this.gl.uniform1f(this.sliceShader.uniforms["dt_scale"], samplingRate);
-      this.gl.uniform1i(this.sliceShader.uniforms["volume"], 0);
-      this.gl.uniform1i(this.sliceShader.uniforms["colormap"], 1);
+      // nv.bindBlankGL(this.gl, this.volume.hdr)
+      // this.sliceShader.use(this.gl)
+      // nv.selectColormap(this.gl)
+      // var samplingRate = 1.0;
+			// this.gl.uniform1f(this.sliceShader.uniforms["dt_scale"], samplingRate);
+      // this.gl.uniform1i(this.sliceShader.uniforms["volume"], 0);
+      // this.gl.uniform1i(this.sliceShader.uniforms["colormap"], 1);
 
-      nv.drawSlices(this.gl, this.sliceShader, this.volume.hdr, 0.5, 0.5, 0.5)
+      nv.updateGLVolume(this.gl, this.volume)
+
+      // nv.drawSlices(this.gl, this.sliceShader, this.volume, 0.5, 0.5, 0.5)
     },
   },
   mounted() {
@@ -53,7 +52,7 @@ export default {
     const canvas = document.querySelector("#gl");
     const gl = canvas.getContext("webgl2");
     this.gl = gl;
-    this.sliceShader = new Shader(this.gl, vertSliceShader, fragSliceShader);
+    // this.sliceShader = new Shader(this.gl, vertSliceShader, fragSliceShader);
     // this.sliceShader.use(this.gl)
     this.gl.enable(this.gl.CULL_FACE);
     this.gl.cullFace(this.gl.FRONT);
@@ -66,12 +65,12 @@ export default {
 
 <style scoped>
 #viewer {
-  background-color: white;
+  background-color: black;
   min-width: 100%;
   min-height: 600px;
 }
 
 body {
-  background-color: white;
+  background-color: black;
 }
 </style>

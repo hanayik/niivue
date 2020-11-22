@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <nii-vue
-      filename="./brain.nii.gz">
+      filename="./Chris_T1.nii.gz">
     </nii-vue>
   </div>
 </template>
