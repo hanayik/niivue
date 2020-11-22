@@ -1,6 +1,6 @@
 # NiiVue
 
-**WARNING: THIS IA A WORK IN PROGRESS**
+**WARNING: THIS IS A WORK IN PROGRESS**
 
 - [Overview]()
 - [Development Environment]()
@@ -8,25 +8,36 @@
 
 # Overview
 
-NiiVue is a minimalists webgl [nifti]() image viewer (for now). 
+NiiVue is a minimalist webgl [nifti]() image viewer (for now). 
 
 The goal is go have a simple viewer component that can be embedded in an existing web page.
 
-The viewer component accepts a volume and a shader as properties (inputs).
+The viewer component accepts a volume URL as a property (i.e. a reactive input).
+
+# Example result
+
+![example image](example.png)
 
 # TODO
 
-- update webgl-util to export functions
-- test nifti reading
-- add in nifti to texture conversion
-- render nifti slices in webgl canvas
+- make viewer resizable
+- allow mouse based slice scrolling
+- allow overlays
 
 # References
 
-https://github.com/Twinklebear/webgl-util
+- https://github.com/Twinklebear/webgl-util
+- https://github.com/rordenlab/MRIcroWeb
+
+# Contributors
+
+- Taylor Hanayik
+- Chris Rorden
 
 ## Development Environment
 ```
+# You must install nodejs on your system FIRST!
+
 git clone git@github.com:hanayik/niivue.git # or https
 cd niivue
 
@@ -35,6 +46,7 @@ npm install
 
 ### Compiles and hot-reloads for development
 ```
+# nifti files are stored in /public
 npm run serve
 ```
 

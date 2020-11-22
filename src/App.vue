@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <nii-vue
-      filename="./Chris_T1.nii.gz">
+      :filename="volumeURL">
     </nii-vue>
   </div>
 </template>
@@ -15,6 +15,13 @@ export default {
   name: 'App',
   components: {
     NiiVue 
+  },
+  data () {
+    // the properties contained here are reactive. 
+    return {
+      // changing volumeURL has the immediate effect of rendering the new volume
+      volumeURL: "./Chris_T1.nii.gz"
+    }
   }
 }
 </script>

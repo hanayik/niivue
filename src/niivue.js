@@ -3,8 +3,59 @@ import * as nii from "nifti-reader-js"
 import { Shader } from "./webgl-util/shader.js";
 import { vertSliceShader, fragSliceShader } from "./shader-srcs.js";
 
-var colormapTexture = null
-var volumeTexture = null
+export var colormapTexture = null
+export var volumeTexture = null
+
+export function scaleTo8Bit(A, volume) {
+	var mn = volume.hdr.cal_min;
+	var mx = volume.hdr.cal_max;
+	var vox = A.length
+	var img8 = new Uint8Array(vox);
+	var scale = 1;
+	var i
+	if (mx > mn) scale = 255 / (mx - mn);
+	for (i = 0; i < (vox - 1); i++) {
+		var v = A[i];
+		v = (v * volume.hdr.scl_slope) + volume.hdr.scl_inter;
+		if (v < mn)
+			img8[i] = 0;
+		else if (v > mx)
+			img8[i] = 255;
+		else
+			img8[i] = (v - mn) * scale;
+	}
+
+	return img8 // return scaled
+}
+
+export function calibrateIntensity(A, volume) {
+	var vox = A.length;
+	var mn = Infinity;
+	var mx = -Infinity;
+	var i
+	for (i = 0; i < (vox - 1); i++) {
+		if (!isFinite(A[i])) continue;
+		if (A[i] < mn) mn = A[i];
+		if (A[i] > mx) mx = A[i];
+	}
+	//calibrate intensity
+	if ((isFinite(volume.hdr.scl_slope)) && (isFinite(volume.hdr.scl_inter)) && (volume.hdr.scl_slope !== 0.0)) {
+		//console.log(">> mn %f mx %f %f %f", mn, mx, hdr.scl_slope, hdr.scl_inter);
+		mn = (mn * volume.hdr.scl_slope) + volume.hdr.scl_inter;
+		mx = (mx * volume.hdr.scl_slope) + volume.hdr.scl_inter;
+	} else {
+		volume.hdr.scl_slope = 1.0;
+		volume.hdr.scl_inter = 0.0;
+	}
+	//console.log("vx %d type %d mn %f mx %f", vox, hdr.datatypeCode, mn, mx);
+	//console.log("cal mn..mx %f..%f", hdr.cal_min, hdr.cal_max);
+	volume.hdr.global_min = mn;
+	volume.hdr.global_max = mx;
+	if ((!isFinite(volume.hdr.cal_min)) || (!isFinite(volume.hdr.cal_max)) || (volume.hdr.cal_min >= volume.hdr.cal_max)) {
+		volume.hdr.cal_min = mn;
+		volume.hdr.cal_max = mx;
+	}
+}
 
 export function loadVolume(url, volume) {
 	var hdr = null
@@ -39,8 +90,8 @@ export function loadVolume(url, volume) {
 	return
 }
 
-export function updateGLVolume(gl, volume) { //load volume or change contrast
-	var cubeStrip = [0,1,0, 1,1,0, 0,1,1, 1,1,1, 1,0,1, 1,1,0, 1,0,0, 0,1,0, 0,0,0, 0,1,1, 0,0,1, 1,0,1, 0,0,0, 1,0,0];
+export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change contrast
+	var cubeStrip = [0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0];
 	var vao = gl.createVertexArray();
 	gl.bindVertexArray(vao);
 	var vbo = gl.createBuffer();
@@ -48,7 +99,7 @@ export function updateGLVolume(gl, volume) { //load volume or change contrast
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cubeStrip), gl.STATIC_DRAW);
 	gl.enableVertexAttribArray(0);
 	gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-	selectColormap(gl, "gray")
+	// selectColormap(gl, "gray")
 	var shader = new Shader(gl, vertSliceShader, fragSliceShader);
 	shader.use(gl)
 	var samplingRate = 1.0;
@@ -59,7 +110,6 @@ export function updateGLVolume(gl, volume) { //load volume or change contrast
 	var img = volume.img
 	// console.log(hdr)
 	// var vox = hdr.dims[1] * hdr.dims[2] * hdr.dims[3];
-
 	var imgRaw = null
 	if (hdr.datatypeCode === 2) //data already uint8
 		imgRaw = new Uint8Array(img);
@@ -69,47 +119,10 @@ export function updateGLVolume(gl, volume) { //load volume or change contrast
 		imgRaw = new Float32Array(img);
 	else if (hdr.datatypeCode === 512)
 		imgRaw = new Uint16Array(img);
-	// var mn = hdr.cal_min;
-	// var mx = hdr.cal_max;
-	var vox = imgRaw.length;
-	var mn = Infinity;
-	var mx = -Infinity;
-	var i
-	for (i = 0; i < (vox-1); i++) {
-		if (!isFinite(imgRaw[i])) continue;
-		if (imgRaw[i] < mn) mn = imgRaw[i];
-		if (imgRaw[i] > mx) mx = imgRaw[i];
-	}
-	//calibrate intensity
-	if ((isFinite(hdr.scl_slope)) && (isFinite(hdr.scl_inter)) && (hdr.scl_slope !== 0.0 )) {
-		//console.log(">> mn %f mx %f %f %f", mn, mx, hdr.scl_slope, hdr.scl_inter);
-		mn = (mn * hdr.scl_slope) + hdr.scl_inter;
-		mx = (mx * hdr.scl_slope) + hdr.scl_inter;
-	} else {
-		hdr.scl_slope = 1.0;
-		hdr.scl_inter = 0.0;
-	}
-	//console.log("vx %d type %d mn %f mx %f", vox, hdr.datatypeCode, mn, mx);
-	//console.log("cal mn..mx %f..%f", hdr.cal_min, hdr.cal_max);
-	hdr.global_min = mn;
-	hdr.global_max = mx;
-	if ((!isFinite(hdr.cal_min)) || (!isFinite(hdr.cal_max)) || (hdr.cal_min >= hdr.cal_max)) {
-		hdr.cal_min = mn;
-		hdr.cal_max = mx;
-	}
-	var img8 = new Uint8Array(vox);
-	var scale = 1;
-	if (mx > mn) scale = 255 / (mx - mn);
-	for (i = 0; i < (vox - 1); i++) {
-		var v = imgRaw[i];
-		v = (v * hdr.scl_slope) + hdr.scl_inter;
-		if (v < mn)
-			img8[i] = 0;
-		else if (v > mx)
-			img8[i] = 255;
-		else
-			img8[i] = (v - mn) * scale;
-	}
+	
+	calibrateIntensity(imgRaw, volume)
+	var img8 = scaleTo8Bit(imgRaw, volume)
+	
 	// console.log(img8)
 	var tex = gl.createTexture();
 	gl.activeTexture(gl.TEXTURE0);
@@ -134,7 +147,7 @@ export function updateGLVolume(gl, volume) { //load volume or change contrast
 	shader.use(gl)
 	gl.uniform3iv(shader.uniforms["volume_dims"], [hdr.dims[1], hdr.dims[2], hdr.dims[3]]);
 	gl.uniform3fv(shader.uniforms["volume_scale"], volScale);
-	drawSlices(gl, shader, volume, 0.5, 0.5, 0.5)
+	drawSlices(gl, shader, volume, aS, cS, sS)
 } // updateVolume()
 
 export function byteBound(flt) { //return range 0..255
