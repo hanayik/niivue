@@ -247,36 +247,9 @@ openDialog.type = 'file';
 openDialog.onchange = e => {
 	selectVolume(e.target.files[0], false);
 }
-document.addEventListener("keydown", function(evt) {
-	if (evt.key == "z")  adjustOpacity(0.9);
-	if (evt.key == "a") adjustOpacity(1.1);
-	if (evt.key == "w") adjustQuality(1.1);
-	if (evt.key == "q")  adjustQuality(0.9);
-});
-if (isDrawOnDemand)
-	document.addEventListener('cameraRedraw', e => glDraw() );
 
-var selectJpeg = function(jpegName) {
-  var matCapImage = null;
-  matCapImage = new Image();
-  //console.log('loading ', jpegName);
-  matCapImage.src = jpegName;  // MUST BE SAME DOMAIN!!!
-  matCapImage.onload = function() {
-  	//console.log('matcap resolution ', matCapImage.width, '<<<', matCapImage.height);
-	if (matcapTexture !== null)
-	gl.deleteTexture(matcapTexture); //release ');
-		matcapTexture = gl.createTexture();
-	gl.activeTexture(gl.TEXTURE3);
-	gl.bindTexture(gl.TEXTURE_2D, matcapTexture);
-	// Set the parameters so we can render any size image.
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-	// Upload the image into the texture.
-	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, matCapImage);
-  }
-} // selectJpeg()
+
+
 
 var selectColormap = function(lutName) {
     var lut = makeLut([0, 255], [0, 255], [0,255], [0,128],[0,255]); //gray
@@ -299,43 +272,26 @@ var selectColormap = function(lutName) {
 	gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 256, 1,gl.RGBA, gl.UNSIGNED_BYTE, lut);
 } // selectColormap()
 
-function adjustQuality(scale) {
-	samplingRate = samplingRate * scale;
-	samplingRate = Math.min(samplingRate, 10.0);
-	samplingRate = Math.max(samplingRate, 0.7);
-	shader.use();
-	gl.uniform1f(shader.uniforms["dt_scale"], samplingRate);
-	console.log('quality ', samplingRate);
-	if (isDrawOnDemand) glDraw();
-} // adjustQuality()
-
-function adjustOpacity(scale) {
-	colorOpacity = colorOpacity * scale;
-	colorOpacity = Math.min(colorOpacity, 10.0);
-	colorOpacity = Math.max(colorOpacity, 0.1);
-	selectColormap(colorName);
-	console.log('opacity ', colorOpacity);
-	if (isDrawOnDemand) glDraw();
-} // adjustOpacity()
 
 var loadVolume = function(url, isURL, onload) {
 	if (!isURL) {
 		var reader = new FileReader();
-        	reader.readAsArrayBuffer(url);
-            reader.addEventListener('load', function(event) {
-            	console.log(event.target.result);
-            	//loadGeometryCore(object, isOverlay);
-            	var hdr = nifti.readHeader(event.target.result);
-				var img;
-				if  (nifti.isCompressed(event.target.result)) {
-					img = nifti.readImage(hdr, nifti.decompress(event.target.result));
-				} else
-					img = nifti.readImage(hdr, event.target.result);
+    reader.readAsArrayBuffer(url);
+    reader.addEventListener('load', function(event) {
+      console.log(event.target.result);
+      //loadGeometryCore(object, isOverlay);
+      var hdr = nifti.readHeader(event.target.result);
+			var img;
+			if  (nifti.isCompressed(event.target.result)) {
+				img = nifti.readImage(hdr, nifti.decompress(event.target.result));
+			} else
+				img = nifti.readImage(hdr, event.target.result);
 				//img = new Uint8Array(img);
 				onload(url, hdr, img);
 
-            });
-        return;
+    	}
+		);
+    return;
 	}
 	var req = new XMLHttpRequest();
 	req.open("GET", url, true);
@@ -365,102 +321,12 @@ var loadVolume = function(url, isURL, onload) {
 	req.send();
 } // loadVolume()
 
-function bindBlankGL() {
-	let texR = gl.createTexture();
-	gl.bindTexture(gl.TEXTURE_3D, texR);
-	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
-	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-	gl.pixelStorei( gl.UNPACK_ALIGNMENT, 1 )
-	gl.texStorage3D(gl.TEXTURE_3D, 1, gl.RGBA8, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
-	return texR;
-} // bindBlankGL()
 
-function gradientGL() {
-	var faceStrip = [0,0,0, 0,1,0, 1,0,0, 1,1,0];
-	var vao2 = gl.createVertexArray();
-	gl.bindVertexArray(vao2);
-	vbo2 = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, vbo2);
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(faceStrip), gl.STATIC_DRAW);
-	gl.enableVertexAttribArray(0);
-	gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-	var fb = gl.createFramebuffer();
-	gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-	gl.disable(gl.CULL_FACE);
-	gl.viewport(0, 0, hdr.dims[1], hdr.dims[2]);
-	gl.disable(gl.BLEND);
- 	tempTex3D = bindBlankGL();
-	blurShader.use();
-	gl.activeTexture(gl.TEXTURE1);
-	gl.bindTexture(gl.TEXTURE_3D, tex);
-	gl.uniform1i(blurShader.uniforms["intensityVol"], 1);
-	gl.uniform1f(blurShader.uniforms["dX"], 0.7/ hdr.dims[1]);
-	gl.uniform1f(blurShader.uniforms["dY"], 0.7/ hdr.dims[2]);
-	gl.uniform1f(blurShader.uniforms["dZ"], 0.7/ hdr.dims[3]);
-	gl.bindVertexArray(vao2);
-	for (i = 0; i < (hdr.dims[3]-1); i++) {
-		var coordZ = 1/hdr.dims[3] * (i + 0.5);
-    	gl.uniform1f(blurShader.uniforms["coordZ"], coordZ);
-    	gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, tempTex3D, 0, i);
-    	gl.clear(gl.DEPTH_BUFFER_BIT);
-    	gl.drawArrays(gl.TRIANGLE_STRIP, 0, faceStrip.length / 3);
-	}
-	sobelShader.use();
-	gl.activeTexture(gl.TEXTURE1);
-	gl.bindTexture(gl.TEXTURE_3D, tempTex3D);//input texture
-	gl.uniform1i(sobelShader.uniforms["intensityVol"], 1);
-	gl.uniform1f(sobelShader.uniforms["dX"], 0.7/ hdr.dims[1]);
-	gl.uniform1f(sobelShader.uniforms["dY"], 0.7/ hdr.dims[2]);
-	gl.uniform1f(sobelShader.uniforms["dZ"], 0.7/ hdr.dims[3]);
-	gl.uniform1f(sobelShader.uniforms["coordZ"], 0.5);
-	gl.bindVertexArray(vao2);
-	gl.activeTexture(gl.TEXTURE0);
-    if (gradientTexture !== null) gl.deleteTexture(gradientTexture);
-	gradientTexture	= bindBlankGL();
-	for (i = 0; i < (hdr.dims[3]-1); i++) {
-		var coordZ = 1/hdr.dims[3] * (i + 0.5);
-    	gl.uniform1f(sobelShader.uniforms["coordZ"], coordZ);
-    	//console.log(coordZ);
-    	gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gradientTexture, 0, i);
-    	gl.clear(gl.DEPTH_BUFFER_BIT);
-    	gl.drawArrays(gl.TRIANGLE_STRIP, 0, faceStrip.length / 3);
-	}
-	gl.deleteFramebuffer(fb);
-	gl.deleteTexture(tempTex3D);
-	//return to volume rendering shader
-	shader.use();
-	gl.bindVertexArray(vao);
-	gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-	gl.activeTexture(gl.TEXTURE0);
-	gl.bindTexture(gl.TEXTURE_3D, volumeTexture);
-	gl.activeTexture(gl.TEXTURE2);
-	gl.bindTexture(gl.TEXTURE_3D, gradientTexture);
-	gl.activeTexture(gl.TEXTURE3);
-	gl.bindTexture(gl.TEXTURE_2D, matcapTexture); //"matcap"
-	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-} // gradientGL()
 
-/*function reportMat(m){
-	console.log("m = [%.2f %.2f %.2f %.2f; %.2f %.2f %.2f %.2f; %.2f %.2f %.2f %.2f; %.2f %.2f %.2f %.2f]",
-		m[0],m[1],m[2],m[3],
-		m[4],m[5],m[6],m[7],
-		m[8],m[9],m[10],m[11],
-		m[12],m[13],m[14],m[15],
-		);
-}*/
 
 var axSlice = 0.5
 var corSlice = 0.5
 var sagSlice = 0.5
-var isInRect = function(x,y,rect) {
-	var isin = x>rect[0] && x < rect[2]+rect[0] && y > rect[1] && y < rect[3]+rect[1]
-	/* console.log(rect) */
-	/* console.log(isin) */
-	return isin
-}
 
 var mydraw = function() {
 	canvas.style.backgroundColor = "black"
@@ -533,59 +399,13 @@ var mydraw = function() {
 function glDraw() {
 	gl.clearColor(0.0, 0.0, 0.0, 0.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
-	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-	if (is2D) { //show 2D slices not rendering
+	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height)
+
+	mydraw()
+	gl.viewport(gl.canvas.width/2, 0, gl.canvas.width/2, gl.canvas.height/2);
 	
-		hWIDTH = Math.round(WIDTH/2) // half width
-		hHEIGHT = Math.round(HEIGHT/2) // half height
-		var clipX = mouseX / gl.canvas.clientWidth  * 2 - 1;    
-		var clipY = mouseY / gl.canvas.clientHeight * -2 + 1;
-		/* console.log(clipX, clipY) */
-		if (isInRect(clipX, clipY, axialRect)) {
-			sagSlice = 1 - clipX / axialRect[2]+axialRect[1]//(mouseX-hWIDTH)/hWIDTH
-			//leftBottomWidthHeight
-			//  0    1    2    3
-			// THIS WORKS (ONLY TESTING AXIAL FOR NOW)
-			corSlice = 1 - clipY / axialRect[1] //1-mouseY/hHEIGHT
-			console.log(corSlice)
-		} else if (isInRect(clipX, clipY, coronalRect)) {
-			/* sagSlice = mouseX/hWIDTH */
-			/* axSlice = 1-(mouseY-hHEIGHT)/hHEIGHT */
-		} else if (isInRect(clipX, clipY, sagitalRect)) {
-			/* corSlice = mouseX/hWIDTH */
-			/* axSlice = 1-mouseY/hHEIGHT */
-		}
-		mydraw()
-		gl.viewport(gl.canvas.width/2, 0, gl.canvas.width/2, gl.canvas.height/2);
-	//} else {
-	} if (true) {
-		shader.use();
-		gl.uniform1f(shader.uniforms["dt_scale"], samplingRate);
-		projView = mat4.mul(projView, proj, camera.camera);
-		gl.uniformMatrix4fv(shader.uniforms["normal_matrix"], false, camera.camera);
-		gl.uniformMatrix4fv(shader.uniforms["proj_view"], false, projView);
-		var eye = camera.eyePos();
-		gl.uniform3fv(shader.uniforms["eye_pos"], eye);
-		//Lighting
-		//"Head-light" with light at camera location:
-		//gl.uniform3fv(shader.uniforms["light_pos"], eye);
-		//we will place a light directly above the camera, mixing headlight with top light
-		var mx = Math.max( Math.abs(...eye) );
-		up = camera.upDir();
-		var light = eye;
-		light[0] = eye[0] + up[0] * mx;
-		light[1] = eye[1] + up[1] * mx;
-		light[2] = eye[2] + up[2] * mx;
-		gl.uniform3fv(shader.uniforms["light_pos"], light);
-		//draw cube
-		gl.drawArrays(gl.TRIANGLE_STRIP, 0, cubeStrip.length / 3);
-	}
 	// Wait for rendering to actually finish
 	gl.finish();
-	if (takeScreenShot) {
-		takeScreenShot = false;
-		canvas.toBlob(function(b) { saveAs(b, "screen.png"); }, "image/png");
-	}
 } // glDraw()
 
 function updateVolume() { //load volume or change contrast
@@ -629,52 +449,12 @@ function updateVolume() { //load volume or change contrast
 	//var dims = [1.0, hdr.dims[1]*hdr.pixdim[1], hdr.dims[2]*hdr.pixdim[2], hdr.dims[3]*hdr.pixdim[3]];
 	longestAxis = Math.max(dims[1], Math.max(dims[2], dims[3]));
 	volScale = [dims[1] / longestAxis, dims[2] / longestAxis, dims[3] / longestAxis];
-	gl.uniform3iv(shader.uniforms["volume_dims"], [hdr.dims[1],hdr.dims[2],hdr.dims[3]]);
-	gl.uniform3fv(shader.uniforms["volume_scale"], volScale);
+	/* gl.uniform3iv(shader.uniforms["volume_dims"], [hdr.dims[1],hdr.dims[2],hdr.dims[3]]); */
+	/* gl.uniform3fv(shader.uniforms["volume_scale"], volScale); */
 	newVolumeUpload = true;
 	//gradientGL();
-	if (!volumeTexture) {
-		volumeTexture = tex;
-		if (isDrawOnDemand)
-			;//glDraw();
-		else {
-			setInterval(function() {
-				// Save them some battery if they're not viewing the tab
-				if (document.hidden) {
-					return;
-				}
-				var startTime = new Date();
-				// Reset the sampling rate and camera for new volumes
-				if (newVolumeUpload) {
-					onWindowResize();
-					samplingRate = 1.0;
-					shader.use();
-					gl.uniform1f(shader.uniforms["dt_scale"], samplingRate);
-				}
-				glDraw();
-				var endTime = new Date();
-				var renderTime = endTime - startTime;
-				var targetSamplingRate = renderTime / targetFrameTime;
-				if (takeScreenShot) {
-					takeScreenShot = false;
-					canvas.toBlob(function(b) { saveAs(b, "screen.png"); }, "image/png");
-				}
-				// If we're dropping frames, decrease the sampling rate
-				if (!newVolumeUpload && targetSamplingRate > samplingRate) {
-					samplingRate = 0.8 * samplingRate + 0.2 * targetSamplingRate;
-					shader.use();
-					gl.uniform1f(shader.uniforms["dt_scale"], samplingRate);
-				}
-				newVolumeUpload = false;
-				startTime = endTime;
-			}, targetFrameTime);
-		}
-	} else {
-		gl.deleteTexture(volumeTexture);
-		volumeTexture = tex;
-		if (isDrawOnDemand) glDraw();
-	}
-	gradientGL();
+	
+	/* gradientGL(); */
 	glDraw();
 } // updateVolume()
 
@@ -727,14 +507,6 @@ var selectVolume = function(url, isURL = true) {
 	});
 } // selectVolume()
 
-function textureFromPixelArray(gl, dataArray, type, width, height) {
-    var dataTypedArray = new Uint8Array(dataArray); // Don't need to do this if the data is already in a typed array
-    var texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, type, width, height, 0, type, gl.UNSIGNED_BYTE, dataTypedArray);
-    // Other texture setup here, like filter modes and mipmap generation
-    return texture;
-} // textureFromPixelArray()
 
 function byteBound(flt) { //return range 0..255
 	var ret = Math.min(flt, 255);
@@ -765,6 +537,7 @@ function makeLut(Rs, Gs, Bs, As, Is) {
 			k++;
 		}
 	}
+		console.log(lut)
     return lut;
 } // makeLut()
 
@@ -784,19 +557,19 @@ window.onload = function(){
 	window.addEventListener('resize', onWindowResize, false);
 	onWindowResize(true);
 	// Register mouse and touch listeners
-	var controller = new Controller();
-	controller.mousemove = function(prev, cur, evt) {
-		if (evt.buttons == 1) {
-			camera.rotate(prev, cur);
+	/* var controller = new Controller(); */
+	/* controller.mousemove = function(prev, cur, evt) { */
+		/* if (evt.buttons == 1) { */
+			/* camera.rotate(prev, cur); */
 
-		} else if (evt.buttons == 2) {
-			camera.pan([cur[0] - prev[0], prev[1] - cur[1]]);
-		}
-	};
-	controller.wheel = function(amt) { camera.zoom(amt); };
-	controller.pinch = controller.wheel;
-	controller.twoFingerDrag = function(drag) { camera.pan(drag); };
-	controller.registerForCanvas(canvas);
+		/* } else if (evt.buttons == 2) { */
+			/* camera.pan([cur[0] - prev[0], prev[1] - cur[1]]); */
+		/* } */
+	/* }; */
+	/* controller.wheel = function(amt) { camera.zoom(amt); }; */
+	/* controller.pinch = controller.wheel; */
+	/* controller.twoFingerDrag = function(drag) { camera.pan(drag); }; */
+	/* controller.registerForCanvas(canvas); */
 	// Setup VAO and VBO to render the cube to run the raymarching shader
 	vao = gl.createVertexArray();
 	gl.bindVertexArray(vao);
@@ -826,7 +599,7 @@ window.onload = function(){
 	//gl.clearColor(1, 0.5, 0.5, 3);
 	// Load the default colormap and upload it, after which we
 	// load the default volume.
-	selectJpeg('0.jpg')
+	/* selectJpeg('0.jpg') */
 	selectColormap("Gray");
 	//selectVolume("spmSmall.nii.gz");
 	selectVolume("spm152.nii.gz");
@@ -872,12 +645,12 @@ function onWindowResize(isInit = false) {
 	//https://webglfundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html
 	//gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 	//gl.viewport(gl.canvas.width/2, 0, gl.canvas.width, gl.canvas.height/2);
-	proj = mat4.perspective(mat4.create(), 15 * Math.PI / 180.0,WIDTH / HEIGHT, 0.1, 100);
-	camera = new ArcballCamera(center, 2, [WIDTH, HEIGHT]);
-	projView = mat4.create();
-	const kRot = Math.sqrt(0.5);
-    camera.rotateY([0.0,kRot]);
-    camera.rotateY([kRot,0.0]);
+	/* proj = mat4.perspective(mat4.create(), 15 * Math.PI / 180.0,WIDTH / HEIGHT, 0.1, 100); */
+	/* camera = new ArcballCamera(center, 2, [WIDTH, HEIGHT]); */
+	/* projView = mat4.create(); */
+	/* const kRot = Math.sqrt(0.5); */
+    /* camera.rotateY([0.0,kRot]); */
+    /* camera.rotateY([kRot,0.0]); */
 	//if (isInit) return;
 	//samplingRate = 1.0;
 	//gl.uniform1f(shader.uniforms["dt_scale"], samplingRate);

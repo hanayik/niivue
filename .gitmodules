@@ -1,0 +1,3 @@
+[submodule "src/webgl-util"]
+	path = src/webgl-util
+	url = git@github.com:hanayik/webgl-util.git
