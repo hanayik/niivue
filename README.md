@@ -38,7 +38,11 @@ The viewer component accepts a volume URL as a property (i.e. a reactive input).
 ```
 # You must install nodejs on your system FIRST!
 
-git clone git@github.com:hanayik/niivue.git # or https
+# Use https protocol if needed
+git clone --recurse-submodules git@github.com:hanayik/niivue.git
+
+# webgl-util is a git submodule so the command above clones that too
+
 cd niivue
 
 npm install
