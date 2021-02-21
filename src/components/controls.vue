@@ -27,6 +27,7 @@
             </v-row>
             <v-row>
              <v-col class="px-4">
+              <p>Intensity range</p>
               <v-range-slider
                 v-model="overlay.intensityRange"
                 :max="overlay.intensityMax"
@@ -58,6 +59,19 @@
                 </template>
               </v-range-slider>
             </v-col> 
+            </v-row>
+
+            <v-row>
+              <v-col>
+              <p>Opacity</p>
+                <v-slider
+                  v-model="overlay.opacity"
+                  step="1"
+                  thumb-label
+                  ticks
+                >
+                </v-slider>
+              </v-col>
             </v-row>
             
           </v-expansion-panel-content>
