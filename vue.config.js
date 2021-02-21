@@ -3,5 +3,9 @@ module.exports = {
     // all paths set to be relative (and correct)
     // (e.g. bundling in an electron app, or serving the static
     // build from a server)
-    publicPath: './'
+    publicPath: './',
+
+    transpileDependencies: [
+      'vuetify'
+    ]
 }
