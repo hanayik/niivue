@@ -8,8 +8,6 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
-    "bootstrap": "^4.5.3",
-    "bootstrap-vue": "^2.19.0",
     "core-js": "^3.6.5",
     "gl-matrix": "^3.3.0",
     "nifti-reader-js": "^0.5.4",
