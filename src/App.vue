@@ -1,60 +1,63 @@
 <template>
   <v-app>
-    <v-app-bar
-      app
-      color="primary"
-      dark
-    >
-      <div class="d-flex align-center">
-        <v-img
-          alt="Vuetify Logo"
-          class="shrink mr-2"
-          contain
-          src="https://cdn.vuetifyjs.com/images/logos/vuetify-logo-dark.png"
-          transition="scale-transition"
-          width="40"
-        />
+      <v-row no-gutters>
+      <!-- app uses a 12 column layout, so the controls take up 4 columns on the left of the screen -->
+      <v-col cols="4">
 
-        <v-img
-          alt="Vuetify Name"
-          class="shrink mt-1 hidden-sm-and-down"
-          contain
-          min-width="100"
-          src="https://cdn.vuetifyjs.com/images/logos/vuetify-name-dark.png"
-          width="100"
-        />
-      </div>
+      <controls :overlays="overlayList">
 
-      <v-spacer></v-spacer>
+      </controls>
 
-      <v-btn
-        href="https://github.com/vuetifyjs/vuetify/releases/latest"
-        target="_blank"
-        text
-      >
-        <span class="mr-2">Latest Release</span>
-        <v-icon>mdi-open-in-new</v-icon>
-      </v-btn>
-    </v-app-bar>
+      </v-col>
+      
+      <v-col cols="8">
+      <glviewer :overlays="overlayList">
 
-    <v-main>
-      <HelloWorld/>
-    </v-main>
+      </glviewer>
+      </v-col>
+      
+    </v-row>
+
   </v-app>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld';
+import controls from './components/controls.vue'
+import glviewer from './components/glviewer.vue'
 
 export default {
   name: 'App',
 
   components: {
-    HelloWorld,
+    controls,
+    glviewer
   },
 
-  data: () => ({
-    //
-  }),
+  data (){
+    return {
+      // changing volumeURL has the immediate effect of rendering the new volume
+      volumeURL: "./Chris_T1.nii.gz",
+      overlayList: [
+        {
+          volumeURL: "./mni152.nii.gz",
+          name: "mni152.nii.gz",
+          intensityMin: 0,
+          intensityMax: 100,
+          intensityRange:[0, 100],
+          colorMap: "gray", // gray
+          opacity: 100,
+        },
+        {
+          volumeURL: "./spm152.nii.gz",
+          name: "spm152.nii.gz",
+          intensityMin: 0,
+          intensityMax: 100,
+          intensityRange:[0, 100],
+          colorMap: "gray", // gray
+          opacity: 100,
+        }
+      ]
+    }
+  },
 };
 </script>

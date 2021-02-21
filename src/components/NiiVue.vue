@@ -1,13 +1,13 @@
 <template>
-  <b-container fluid id="viewer">
-    <canvas id="gl" width="640" height="480"> </canvas>
-  </b-container>
+  <v-col cols="9" sm="6" id="viewer">
+    <canvas id="gl" width="100%" height="100%"> </canvas>
+  </v-col>
 </template>
 <script>
 import * as nv from "../niivue.js";
 
 export default {
-  name: "NiiVue",
+  name: "glviewer",
   /*
   props are passed to the nii-vue component from it's parent
   they can be used. Similar to passing variables to a function

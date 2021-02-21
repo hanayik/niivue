@@ -5,6 +5,7 @@ import { vertSliceShader, fragSliceShader } from "./shader-srcs.js";
 
 export var colormapTexture = null
 export var volumeTexture = null
+export var mouse = {x: -1, y:-1}
 
 export function scaleTo8Bit(A, volume) {
 	var mn = volume.hdr.cal_min;
@@ -119,10 +120,10 @@ export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change
 		imgRaw = new Float32Array(img);
 	else if (hdr.datatypeCode === 512)
 		imgRaw = new Uint16Array(img);
-	
+
 	calibrateIntensity(imgRaw, volume)
 	var img8 = scaleTo8Bit(imgRaw, volume)
-	
+
 	// console.log(img8)
 	var tex = gl.createTexture();
 	gl.activeTexture(gl.TEXTURE0);
