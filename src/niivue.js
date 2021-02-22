@@ -5,9 +5,10 @@ import { vertSliceShader, fragSliceShader } from "./shader-srcs.js";
 
 export var colormapTexture = null
 export var volumeTexture = null
+export var sliceShader = null //shader program for 2D slice views
 export var mouse = {x: -1, y:-1}
 
-export function scaleTo8Bit(A, volume) {
+function scaleTo8Bit(A, volume) {
 	var mn = volume.hdr.cal_min;
 	var mx = volume.hdr.cal_max;
 	var vox = A.length
@@ -20,7 +21,6 @@ export function scaleTo8Bit(A, volume) {
 		v = (v * volume.hdr.scl_slope) + volume.hdr.scl_inter;
 		img8[i] = (v - mn) * scale;
 	}
-
 	return img8 // return scaled
 }
 
@@ -86,6 +86,15 @@ export function loadVolume(url, volume) {
 	return
 }
 
+export function init(gl) {
+	//initial setup: only at the startup of the component
+	console.log("niivue: init");
+	sliceShader = new Shader(gl, vertSliceShader, fragSliceShader);
+	sliceShader.use(gl)
+	gl.uniform1i(sliceShader.uniforms["volume"], 0);
+	gl.uniform1i(sliceShader.uniforms["colormap"], 1);
+}
+
 export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change contrast
 	var cubeStrip = [0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0];
 	var vao = gl.createVertexArray();
@@ -96,10 +105,6 @@ export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change
 	gl.enableVertexAttribArray(0);
 	gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
 	// selectColormap(gl, "gray")
-	var shader = new Shader(gl, vertSliceShader, fragSliceShader);
-	shader.use(gl)
-	gl.uniform1i(shader.uniforms["volume"], 0);
-	gl.uniform1i(shader.uniforms["colormap"], 1);
 	var hdr = volume.hdr
 	var img = volume.img
 	// console.log(hdr)
@@ -116,9 +121,11 @@ export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change
 	calibrateIntensity(imgRaw, volume)
 	var img8 = scaleTo8Bit(imgRaw, volume)
 	// console.log(img8)
-	var tex = gl.createTexture();
+	if (volumeTexture)
+		gl.deleteTexture(volumeTexture);
+	volumeTexture = gl.createTexture();
 	gl.activeTexture(gl.TEXTURE0);
-	gl.bindTexture(gl.TEXTURE_3D, tex);
+	gl.bindTexture(gl.TEXTURE_3D, volumeTexture);
 	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
@@ -128,20 +135,21 @@ export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change
 	gl.texStorage3D(gl.TEXTURE_3D, 1, gl.R8, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
 	gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], gl.RED, gl.UNSIGNED_BYTE, img8);
 	/*
+	//Volume Rendering values:
 	var dims = [1.0, hdr.dims[1] * hdr.pixDims[1], hdr.dims[2] * hdr.pixDims[2], hdr.dims[3] * hdr.pixDims[3]];
 	var longestAxis = Math.max(dims[1], Math.max(dims[2], dims[3]));
 	var volScale = [dims[1] / longestAxis, dims[2] / longestAxis, dims[3] / longestAxis];
-	if (!volumeTexture) {
-		volumeTexture = tex;
-	} else {
-		gl.deleteTexture(volumeTexture);
-		volumeTexture = tex;
-	}
 	shader.use(gl)
 	gl.uniform3iv(shader.uniforms["volume_dims"], [hdr.dims[1], hdr.dims[2], hdr.dims[3]]);
 	gl.uniform3fv(shader.uniforms["volume_scale"], volScale);
 	*/
-	drawSlices(gl, shader, volume, aS, cS, sS)
+	/*if (sliceShader)
+		gl.deleteShader(sliceShader);	
+	sliceShader = new Shader(gl, vertSliceShader, fragSliceShader);
+	sliceShader.use(gl)
+	gl.uniform1i(sliceShader.uniforms["volume"], 0);
+	gl.uniform1i(sliceShader.uniforms["colormap"], 1);*/
+	drawSlices(gl, sliceShader, volume, aS, cS, sS)
 } // updateVolume()
 
 export function selectColormap(gl, lutName = "") {
@@ -165,7 +173,7 @@ export function selectColormap(gl, lutName = "") {
 	console.log("set colormap")
 } // selectColormap()
 
-export function makeLut(Rs, Gs, Bs, As, Is) {
+function makeLut(Rs, Gs, Bs, As, Is) {
 	//create color lookup table provided arrays of reds, greens, blues, alphas and intensity indices
 	//intensity indices should be in increasing order with the first value 0 and the last 255.
 	// makeLut([0, 255], [0, 0], [0,0], [0,128],[0,255]); //red gradient
@@ -188,7 +196,7 @@ export function makeLut(Rs, Gs, Bs, As, Is) {
 			k++;
 		}
 	}
-	console.log(lut)
+	//console.log(lut)
 	return lut;
 } // makeLut()
 
@@ -227,7 +235,7 @@ export function drawSlices(gl, shader, volume, a, c, s) {
 	w = volScale[0] * xAR;
 	h = volScale[2] * yAR;
 	console.log("drawing coronal")
-	console.log("!>", Math.random())
+	//console.log("drawSlices >", Math.random())
 	
 	shader.use(gl);
 	gl.uniform1i(shader.uniforms["axCorSag"], 1);

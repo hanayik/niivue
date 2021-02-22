@@ -49,6 +49,7 @@ export default {
     this.gl.cullFace(this.gl.FRONT);
     this.gl.enable(this.gl.BLEND);
     this.gl.blendFunc(this.gl.ONE, this.gl.ONE_MINUS_SRC_ALPHA);
+	nv.init(this.gl);
     nv.loadVolume(this.overlays[0].volumeURL, this.volume); // just load first overlay. addtional overlays are not handled yet
   },
 };
