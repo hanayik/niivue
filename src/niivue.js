@@ -144,7 +144,7 @@ export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change
 	gl.uniform3fv(shader.uniforms["volume_scale"], volScale);
 	*/
 	/*if (sliceShader)
-		gl.deleteShader(sliceShader);	
+		gl.deleteShader(sliceShader);
 	sliceShader = new Shader(gl, vertSliceShader, fragSliceShader);
 	sliceShader.use(gl)
 	gl.uniform1i(sliceShader.uniforms["volume"], 0);
@@ -236,7 +236,7 @@ export function drawSlices(gl, shader, volume, a, c, s) {
 	h = volScale[2] * yAR;
 	console.log("drawing coronal")
 	//console.log("drawSlices >", Math.random())
-	
+
 	shader.use(gl);
 	gl.uniform1i(shader.uniforms["axCorSag"], 1);
 	gl.uniform1f(shader.uniforms["slice"], c);

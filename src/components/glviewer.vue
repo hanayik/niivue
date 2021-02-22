@@ -28,6 +28,15 @@ export default {
       nv.updateGLVolume(this.gl, this.volume, 0.5, 0.5, 0.5)
     },
   },
+  methods: {
+    onWindowResize: function() {
+      var canvas = document.querySelector("#gl") 
+      var viewer = document.querySelector("#viewer")
+      canvas.width = viewer.offsetWidth-1
+      canvas.height = viewer.offsetHeight-1
+      nv.drawSlices(this.gl, nv.sliceShader, this.volume, 0.5, 0.5, 0.5)
+    }
+  },
   mounted() {
     // get the gl context after the component has been mounted and initialized
     const glEl = document.createElement('canvas')
@@ -44,13 +53,16 @@ export default {
       nv.mouse.y = e.clientY - rect.top
       console.log(nv.mouse)
     })
+
+    window.addEventListener('resize', this.onWindowResize)
     this.gl = gl;
     this.gl.enable(this.gl.CULL_FACE);
     this.gl.cullFace(this.gl.FRONT);
     this.gl.enable(this.gl.BLEND);
     this.gl.blendFunc(this.gl.ONE, this.gl.ONE_MINUS_SRC_ALPHA);
-	nv.init(this.gl);
+    nv.init(this.gl);
     nv.loadVolume(this.overlays[0].volumeURL, this.volume); // just load first overlay. addtional overlays are not handled yet
+
   },
 };
 </script>
