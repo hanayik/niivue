@@ -12,6 +12,7 @@
     "gl-matrix": "^3.3.0",
     "nifti-reader-js": "^0.5.4",
     "vue": "^2.6.12",
+    "vuedraggable": "^2.24.3",
     "vuetify": "^2.4.0"
   },
   "devDependencies": {

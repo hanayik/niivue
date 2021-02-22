@@ -13,7 +13,17 @@ export var crosshairColor =  [1, 0, 0, 1];
 export var backColor =  [0, 0, 0, 1];
 export var mouse = {x: -1, y:-1}
 
-function scaleTo8Bit(A, volume) {
+export function getGL() {
+
+  var gl = document.querySelector("#gl").getContext("webgl2")
+  if (!gl) {
+    return null
+  }
+  return gl
+
+}
+function scaleTo8Bit(A, overlayItem) {
+  var volume = overlayItem.volume
 	var mn = volume.hdr.cal_min;
 	var mx = volume.hdr.cal_max;
 	var vox = A.length
@@ -29,8 +39,9 @@ function scaleTo8Bit(A, volume) {
 	return img8 // return scaled
 }
 
-export function calibrateIntensity(A, volume) {
-	var vox = A.length;
+export function calibrateIntensity(A, overlayItem) {
+  var volume = overlayItem.volume
+  var vox = A.length;
 	var mn = Infinity;
 	var mx = -Infinity;
 	var i
@@ -58,9 +69,10 @@ export function calibrateIntensity(A, volume) {
 	}
 }
 
-export function loadVolume(url, volume) {
+export function loadVolume(overlayItem) {
 	var hdr = null
 	var img = null
+  var url = overlayItem.volumeURL
 	// var volume = Object
 	var req = new XMLHttpRequest();
 	req.open("GET", url, true);
@@ -83,9 +95,9 @@ export function loadVolume(url, volume) {
 			alert("Unable to load buffer properly from volume?");
 			console.log("no buffer?");
 		}
-		// console.log(hdr)
-		volume.hdr = hdr
-		volume.img = img
+		overlayItem.volume.hdr = hdr
+		overlayItem.volume.img = img
+
 	};
 	req.send();
 	return
@@ -101,7 +113,7 @@ export function init(gl) {
 	lineShader = new Shader(gl, vertLineShader, fragLineShader);
 }
 
-export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change contrast
+export function updateGLVolume(gl, overlayItem, aS, cS, sS) { //load volume or change contrast
 	var cubeStrip = [0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0];
 	var vao = gl.createVertexArray();
 	gl.bindVertexArray(vao);
@@ -111,8 +123,8 @@ export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change
 	gl.enableVertexAttribArray(0);
 	gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
 	// selectColormap(gl, "gray")
-	var hdr = volume.hdr
-	var img = volume.img
+	var hdr = overlayItem.volume.hdr
+	var img = overlayItem.volume.img
 	// console.log(hdr)
 	// var vox = hdr.dims[1] * hdr.dims[2] * hdr.dims[3];
 	var imgRaw = null
@@ -124,8 +136,8 @@ export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change
 		imgRaw = new Float32Array(img);
 	else if (hdr.datatypeCode === 512)
 		imgRaw = new Uint16Array(img);
-	calibrateIntensity(imgRaw, volume)
-	var img8 = scaleTo8Bit(imgRaw, volume)
+	calibrateIntensity(imgRaw, overlayItem)
+	var img8 = scaleTo8Bit(imgRaw, overlayItem)
 	// console.log(img8)
 	if (volumeTexture)
 		gl.deleteTexture(volumeTexture);
@@ -155,7 +167,7 @@ export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change
 	sliceShader.use(gl)
 	gl.uniform1i(sliceShader.uniforms["volume"], 0);
 	gl.uniform1i(sliceShader.uniforms["colormap"], 1);*/
-	drawSlices(gl, volume, aS, cS, sS)
+	drawSlices(gl, overlayItem, aS, cS, sS)
 } // updateVolume()
 
 export function selectColormap(gl, lutName = "") {
@@ -207,8 +219,8 @@ function makeLut(Rs, Gs, Bs, As, Is) {
 } // makeLut()
 
 
-export function drawSlices(gl, volume, a, c, s) {
-	var hdr = volume.hdr
+export function drawSlices(gl, overlayItem, a, c, s) {
+	var hdr = overlayItem.volume.hdr
 	console.log("drawing slices")
 	gl.clearColor(backColor[0], backColor[1], backColor[2], backColor[3]);
 	//gl.clearColor(1.0, 1.0, 0.0, 0.0);
