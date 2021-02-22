@@ -11,19 +11,14 @@ export function scaleTo8Bit(A, volume) {
 	var mn = volume.hdr.cal_min;
 	var mx = volume.hdr.cal_max;
 	var vox = A.length
-	var img8 = new Uint8Array(vox);
+	var img8 = new Uint8ClampedArray(vox);
 	var scale = 1;
 	var i
 	if (mx > mn) scale = 255 / (mx - mn);
 	for (i = 0; i < (vox - 1); i++) {
 		var v = A[i];
 		v = (v * volume.hdr.scl_slope) + volume.hdr.scl_inter;
-		if (v < mn)
-			img8[i] = 0;
-		else if (v > mx)
-			img8[i] = 255;
-		else
-			img8[i] = (v - mn) * scale;
+		img8[i] = (v - mn) * scale;
 	}
 
 	return img8 // return scaled
@@ -103,8 +98,6 @@ export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change
 	// selectColormap(gl, "gray")
 	var shader = new Shader(gl, vertSliceShader, fragSliceShader);
 	shader.use(gl)
-	var samplingRate = 1.0;
-	gl.uniform1f(shader.uniforms["dt_scale"], samplingRate);
 	gl.uniform1i(shader.uniforms["volume"], 0);
 	gl.uniform1i(shader.uniforms["colormap"], 1);
 	var hdr = volume.hdr
@@ -120,10 +113,8 @@ export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change
 		imgRaw = new Float32Array(img);
 	else if (hdr.datatypeCode === 512)
 		imgRaw = new Uint16Array(img);
-
 	calibrateIntensity(imgRaw, volume)
 	var img8 = scaleTo8Bit(imgRaw, volume)
-
 	// console.log(img8)
 	var tex = gl.createTexture();
 	gl.activeTexture(gl.TEXTURE0);
@@ -136,6 +127,7 @@ export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change
 	gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
 	gl.texStorage3D(gl.TEXTURE_3D, 1, gl.R8, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
 	gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], gl.RED, gl.UNSIGNED_BYTE, img8);
+	/*
 	var dims = [1.0, hdr.dims[1] * hdr.pixDims[1], hdr.dims[2] * hdr.pixDims[2], hdr.dims[3] * hdr.pixDims[3]];
 	var longestAxis = Math.max(dims[1], Math.max(dims[2], dims[3]));
 	var volScale = [dims[1] / longestAxis, dims[2] / longestAxis, dims[3] / longestAxis];
@@ -148,13 +140,9 @@ export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change
 	shader.use(gl)
 	gl.uniform3iv(shader.uniforms["volume_dims"], [hdr.dims[1], hdr.dims[2], hdr.dims[3]]);
 	gl.uniform3fv(shader.uniforms["volume_scale"], volScale);
+	*/
 	drawSlices(gl, shader, volume, aS, cS, sS)
 } // updateVolume()
-
-export function byteBound(flt) { //return range 0..255
-	var ret = Math.min(flt, 255);
-	return Math.max(ret, 0);
-}
 
 export function selectColormap(gl, lutName = "") {
 	var lut = makeLut([0, 255], [0, 255], [0, 255], [0, 128], [0, 255]); //gray
@@ -181,7 +169,7 @@ export function makeLut(Rs, Gs, Bs, As, Is) {
 	//create color lookup table provided arrays of reds, greens, blues, alphas and intensity indices
 	//intensity indices should be in increasing order with the first value 0 and the last 255.
 	// makeLut([0, 255], [0, 0], [0,0], [0,128],[0,255]); //red gradient
-	var lut = new Uint8Array(256 * 4);
+	var lut = new Uint8ClampedArray(256 * 4);
 	for (var i = 0; i < (Is.length - 1); i++) {
 		//return a + f * (b - a);
 		var idxLo = Is[i];
@@ -190,13 +178,13 @@ export function makeLut(Rs, Gs, Bs, As, Is) {
 		var k = idxLo * 4;
 		for (var j = idxLo; j <= idxHi; j++) {
 			var f = (j - idxLo) / idxRng;
-			lut[k] = byteBound(Rs[i] + f * (Rs[i + 1] - Rs[i])); //Red
+			lut[k] = Rs[i] + f * (Rs[i + 1] - Rs[i]); //Red
 			k++;
-			lut[k] = byteBound(Gs[i] + f * (Gs[i + 1] - Gs[i])); //Green
+			lut[k] = Gs[i] + f * (Gs[i + 1] - Gs[i]); //Green
 			k++;
-			lut[k] = byteBound(Bs[i] + f * (Bs[i + 1] - Bs[i])); //Blue
+			lut[k] = Bs[i] + f * (Bs[i + 1] - Bs[i]); //Blue
 			k++;
-			lut[k] = byteBound(As[i] + f * (As[i + 1] - As[i])); //Alpha
+			lut[k] = As[i] + f * (As[i + 1] - As[i]); //Alpha
 			k++;
 		}
 	}
@@ -239,6 +227,8 @@ export function drawSlices(gl, shader, volume, a, c, s) {
 	w = volScale[0] * xAR;
 	h = volScale[2] * yAR;
 	console.log("drawing coronal")
+	console.log("!>", Math.random())
+	
 	shader.use(gl);
 	gl.uniform1i(shader.uniforms["axCorSag"], 1);
 	gl.uniform1f(shader.uniforms["slice"], c);

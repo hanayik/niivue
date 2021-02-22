@@ -26,7 +26,6 @@ The viewer component accepts a volume URL as a property (i.e. a reactive input).
 
 # References
 
-- https://github.com/Twinklebear/webgl-util
 - https://github.com/rordenlab/MRIcroWeb
 
 # Contributors
