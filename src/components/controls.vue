@@ -117,7 +117,6 @@ export default {
 <style scoped>
 
 #controls {
-  height: 100%;
 }
 
 </style>

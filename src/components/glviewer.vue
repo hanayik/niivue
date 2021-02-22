@@ -1,6 +1,5 @@
 <template>
-  <div id="viewer">
-  </div>
+  <div id="viewer" ></div>
 </template>
 <script>
 import * as nv from "../niivue.js";
@@ -34,7 +33,7 @@ export default {
       var viewer = document.querySelector("#viewer")
       canvas.width = viewer.offsetWidth-1
       canvas.height = viewer.offsetHeight-1
-      nv.drawSlices(this.gl, nv.sliceShader, this.volume, 0.5, 0.5, 0.5)
+      nv.drawSlices(this.gl, this.volume, 0.5, 0.5, 0.5)
     }
   },
   mounted() {
@@ -70,9 +69,10 @@ export default {
 <style scoped>
 #viewer {
   background-color: black;
-  min-width: 100%;
-  height: 100%;
-  min-height: 600px;
+  width: 100%;
+  height:100%;
+  max-height: 600px;
+  max-width: 1200px;
 }
 
 body {

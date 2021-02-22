@@ -291,5 +291,5 @@ export function drawSlices(gl, volume, a, c, s) {
 
 	// gl.viewport(gl.canvas.width / 2, 0, gl.canvas.width / 2, gl.canvas.height / 2);
 	// Wait for rendering to actually finish
-	//gl.finish()
+	gl.finish()
 }

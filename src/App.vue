@@ -3,17 +3,18 @@
       <v-row no-gutters>
       <!-- app uses a 12 column layout, so the controls take up 4 columns on the left of the screen -->
       <v-col cols="4">
-
-      <controls :overlays="overlayList">
-
-      </controls>
-
+        <controls :overlays="overlayList">
+        </controls>
       </v-col>
-      
-      <v-col cols="8">
-      <glviewer :overlays="overlayList">
 
-      </glviewer>
+      <v-col cols="8">
+        <!--scene controls -->
+        <v-row class='scene-controls' no-gutters>
+
+        </v-row>
+        <glviewer :overlays="overlayList">
+
+        </glviewer>
       </v-col>
       
     </v-row>
@@ -61,3 +62,12 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+
+  .scene-controls {
+    height: 140px;
+    width: auto;
+  }
+
+</style>
