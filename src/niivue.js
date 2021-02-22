@@ -2,10 +2,15 @@
 import * as nii from "nifti-reader-js"
 import { Shader } from "./webgl-util/shader.js";
 import { vertSliceShader, fragSliceShader } from "./shader-srcs.js";
+import { vertLineShader, fragLineShader } from "./shader-srcs.js";
 
 export var colormapTexture = null
 export var volumeTexture = null
-export var sliceShader = null //shader program for 2D slice views
+export var sliceShader = null //program for 2D slice views
+export var lineShader = null //program for cross-hairs
+export var crosshairWidth = 0.005;
+export var crosshairColor =  [1, 0, 0, 1];
+export var backColor =  [0, 0, 0, 1];
 export var mouse = {x: -1, y:-1}
 
 function scaleTo8Bit(A, volume) {
@@ -93,6 +98,7 @@ export function init(gl) {
 	sliceShader.use(gl)
 	gl.uniform1i(sliceShader.uniforms["volume"], 0);
 	gl.uniform1i(sliceShader.uniforms["colormap"], 1);
+	lineShader = new Shader(gl, vertLineShader, fragLineShader);
 }
 
 export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change contrast
@@ -149,7 +155,7 @@ export function updateGLVolume(gl, volume, aS, cS, sS) { //load volume or change
 	sliceShader.use(gl)
 	gl.uniform1i(sliceShader.uniforms["volume"], 0);
 	gl.uniform1i(sliceShader.uniforms["colormap"], 1);*/
-	drawSlices(gl, sliceShader, volume, aS, cS, sS)
+	drawSlices(gl, volume, aS, cS, sS)
 } // updateVolume()
 
 export function selectColormap(gl, lutName = "") {
@@ -201,10 +207,11 @@ function makeLut(Rs, Gs, Bs, As, Is) {
 } // makeLut()
 
 
-export function drawSlices(gl, shader, volume, a, c, s) {
+export function drawSlices(gl, volume, a, c, s) {
 	var hdr = volume.hdr
 	console.log("drawing slices")
-	gl.clearColor(0.0, 0.0, 0.0, 0.0);
+	gl.clearColor(backColor[0], backColor[1], backColor[2], backColor[3]);
+	//gl.clearColor(1.0, 1.0, 0.0, 0.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);
 	console.log("viewport width ", gl.canvas.width)
 	console.log("viewport height ", gl.canvas.height)
@@ -222,37 +229,67 @@ export function drawSlices(gl, shader, volume, a, c, s) {
 	}
 	console.log("xAR ", xAR)
 	console.log("yAR ", yAR)
+	sliceShader.use(gl);
 
+	console.log("drawing axial")
 	var w = volScale[0] * xAR;
 	var h = volScale[1] * yAR;
-	console.log("drawing axial")
-	shader.use(gl);
-	gl.uniform1i(shader.uniforms["axCorSag"], 0);
-	gl.uniform1f(shader.uniforms["slice"], a);
-	gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], -w, -h, w, h);
+	gl.uniform1i(sliceShader.uniforms["axCorSag"], 0);
+	gl.uniform1f(sliceShader.uniforms["slice"], a);
+	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], -w, -h, w, h);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 
+	console.log("drawing coronal")
 	w = volScale[0] * xAR;
 	h = volScale[2] * yAR;
-	console.log("drawing coronal")
-	//console.log("drawSlices >", Math.random())
 
-	shader.use(gl);
-	gl.uniform1i(shader.uniforms["axCorSag"], 1);
-	gl.uniform1f(shader.uniforms["slice"], c);
-	gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], -w, 0, w, h);
+	gl.uniform1i(sliceShader.uniforms["axCorSag"], 1);
+	gl.uniform1f(sliceShader.uniforms["slice"], c);
+	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], -w, 0, w, h);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 
+	console.log("drawing sagittal")
 	w = volScale[1] * xAR;
 	h = volScale[2] * yAR;
-	console.log("drawing sagital")
-	shader.use(gl);
-	gl.uniform1i(shader.uniforms["axCorSag"], 2);
-	gl.uniform1f(shader.uniforms["slice"], s);
-	gl.uniform4f(shader.uniforms["leftBottomWidthHeight"], 0, 0, w, h);
+	gl.uniform1i(sliceShader.uniforms["axCorSag"], 2);
+	gl.uniform1f(sliceShader.uniforms["slice"], s);
+	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], 0, 0, w, h);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+
+	if (crosshairWidth <= 0.0) {
+		//gl.finish()
+		return;
+	}
+	lineShader.use(gl)
+	gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
+	console.log("drawing axial crosshairs")
+	w = volScale[0] * xAR;
+	h = volScale[1] * yAR;
+	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w, -h+(c* h)-crosshairWidth, w, crosshairWidth);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w+(s* w)-crosshairWidth, -h, crosshairWidth, h);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+
+	console.log("drawing coronal crosshairs")
+	w = volScale[0] * xAR;
+	h = volScale[2] * yAR;
+	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w, 0+(a* h)-crosshairWidth, w, crosshairWidth);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w+(s* w)-crosshairWidth, 0, crosshairWidth, h);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+
+	console.log("drawing sagittal crosshairs")
+	w = volScale[1] * xAR;
+	h = volScale[2] * yAR;
+	//gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w, h+(c* h)-crosshairWidth, w, crosshairWidth);
+	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], 0, 0+(a* h)-crosshairWidth, w, crosshairWidth);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], 0+(c* w)-crosshairWidth, 0, crosshairWidth, h);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+
+
 
 	// gl.viewport(gl.canvas.width / 2, 0, gl.canvas.width / 2, gl.canvas.height / 2);
 	// Wait for rendering to actually finish
-	gl.finish()
+	//gl.finish()
 }
