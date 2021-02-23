@@ -16,24 +16,29 @@ export default {
   },
   data() {
     return {
-      volume: { hdr: null, img: null },
+      selectedOverlay: 0
     };
   },
   watch: {
     // watch for changes to hdr property of volume object
     // this detects changes from hdr=null to hdr=real_data
-    "volume.hdr": function () {
-      nv.selectColormap(this.gl, "gray")
-      nv.updateGLVolume(this.gl, this.volume, 0.5, 0.5, 0.5)
+    overlays: {
+      deep: true,
+      handler () {
+        nv.selectColormap(this.gl, this.overlays[this.selectedOverlay].colorMap)
+        nv.updateGLVolume(this.gl, this.overlays[this.selectedOverlay], 0.5, 0.5, 0.5)
     },
-  },
+
+    }
+    
+      },
   methods: {
     onWindowResize: function() {
       var canvas = document.querySelector("#gl") 
       var viewer = document.querySelector("#viewer")
       canvas.width = viewer.offsetWidth-1
       canvas.height = viewer.offsetHeight-1
-      nv.drawSlices(this.gl, this.volume, 0.5, 0.5, 0.5)
+      nv.drawSlices(this.gl, this.overlays[this.selectedOverlay], 0.5, 0.5, 0.5)
     }
   },
   mounted() {
@@ -60,7 +65,7 @@ export default {
     this.gl.enable(this.gl.BLEND);
     this.gl.blendFunc(this.gl.ONE, this.gl.ONE_MINUS_SRC_ALPHA);
     nv.init(this.gl);
-    nv.loadVolume(this.overlays[0].volumeURL, this.volume); // just load first overlay. addtional overlays are not handled yet
+    nv.loadVolume(this.overlays[this.selectedOverlay]); // just load first overlay. addtional overlays are not handled yet
 
   },
 };
@@ -71,8 +76,12 @@ export default {
   background-color: black;
   width: 100%;
   height:100%;
+  min-height: 600px;
   max-height: 600px;
+  min-width: 600px;
   max-width: 1200px;
+  overflow-x: hidden;
+  overflow-y: hidden;
 }
 
 body {

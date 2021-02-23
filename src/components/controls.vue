@@ -8,11 +8,13 @@
     </v-row>
     <v-row no-gutters>
       <v-expansion-panels>
-        <v-expansion-panel
+        <draggable class="row mx-2 my-2" v-model="overlays">
+          <v-expansion-panel
           v-for="(overlay, i) in overlays"
           :key="i">
           <v-expansion-panel-header>
             <v-row no-gutters class="align-center">
+              <v-icon class="mx-2"> mdi-drag-horizontal-variant </v-icon>
               <v-icon class="mx-2" @click.stop="toggleEye"> {{ eyeIcon }} </v-icon>{{ overlay.name }}
             </v-row>
             
@@ -21,7 +23,7 @@
             <v-row>
               <v-select
                 :items="colorMaps"
-                v-model="colorSelected"
+                v-model="overlay.colorMap"
                 label="Color map">
               </v-select>
             </v-row>
@@ -76,6 +78,8 @@
             
           </v-expansion-panel-content>
         </v-expansion-panel>
+
+        </draggable>
       </v-expansion-panels>
     </v-row>
 
@@ -84,6 +88,7 @@
 </template>
 
 <script>
+import draggable from "vuedraggable";
 
 export default {
   props: {
@@ -93,13 +98,15 @@ export default {
   name: 'controls',
 
   components: {
+    draggable
   },
 
   data (){
     return {
       colorSelected: 'gray',
-      colorMaps:['gray', 'red', 'blue', 'green'],
-      eyeIcon: "mdi-eye"
+      colorMaps:['gray', 'Plasma', 'Viridis', 'Inferno'],
+      eyeIcon: "mdi-eye",
+      overlays_: this.overlays
       
     }
   },
@@ -107,6 +114,11 @@ export default {
   methods: {
     toggleEye: function() {
       this.eyeIcon = this.eyeIcon == "mdi-eye" ? "mdi-eye-off" : "mdi-eye"
+    },
+
+    onColorChange: function(event, idx) {
+      console.log(event)
+      console.log(idx)
     }
   }
 
