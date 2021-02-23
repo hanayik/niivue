@@ -26,7 +26,7 @@ export default {
       deep: true,
       handler () {
         nv.selectColormap(this.gl, this.overlays[this.selectedOverlay].colorMap)
-        nv.updateGLVolume(this.gl, this.overlays[this.selectedOverlay], 0.5, 0.5, 0.5)
+        nv.updateGLVolume(this.gl, this.overlays[this.selectedOverlay])
     },
 
     }
@@ -38,7 +38,7 @@ export default {
       var viewer = document.querySelector("#viewer")
       canvas.width = viewer.offsetWidth-1
       canvas.height = viewer.offsetHeight-1
-      nv.drawSlices(this.gl, this.overlays[this.selectedOverlay], 0.5, 0.5, 0.5)
+      nv.drawSlices(this.gl, this.overlays[this.selectedOverlay])
     }
   },
   mounted() {
@@ -53,9 +53,10 @@ export default {
     const gl = canvas.getContext("webgl2");
     gl.canvas.addEventListener('mousedown', (e) => {
       const rect = canvas.getBoundingClientRect()
-      nv.mouse.x = e.clientX - rect.left
-      nv.mouse.y = e.clientY - rect.top
-      console.log(nv.mouse)
+      //nv.mouse.x = e.clientX - rect.left
+      //nv.mouse.y = e.clientY - rect.top
+      nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
+      //console.log(nv.mouse)
     })
 
     window.addEventListener('resize', this.onWindowResize)
