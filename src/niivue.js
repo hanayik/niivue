@@ -10,8 +10,10 @@ export var sliceShader = null //program for 2D slice views
 export var lineShader = null //program for cross-hairs
 export var crosshairWidth = 0.005;
 export var crosshairColor =  [1, 0, 0, 1];
+export var crosshairPos = [0.5, 0.5, 0.5];
 export var backColor =  [0, 0, 0, 1];
-export var mouse = {x: -1, y:-1}
+
+//export var mouse = {x: -1, y:-1}
 
 export function getGL() {
 
@@ -113,7 +115,7 @@ export function init(gl) {
 	lineShader = new Shader(gl, vertLineShader, fragLineShader);
 }
 
-export function updateGLVolume(gl, overlayItem, aS, cS, sS) { //load volume or change contrast
+export function updateGLVolume(gl, overlayItem) { //load volume or change contrast
 	var cubeStrip = [0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0];
 	var vao = gl.createVertexArray();
 	gl.bindVertexArray(vao);
@@ -167,7 +169,7 @@ export function updateGLVolume(gl, overlayItem, aS, cS, sS) { //load volume or c
 	sliceShader.use(gl)
 	gl.uniform1i(sliceShader.uniforms["volume"], 0);
 	gl.uniform1i(sliceShader.uniforms["colormap"], 1);*/
-	drawSlices(gl, overlayItem, aS, cS, sS)
+	drawSlices(gl, overlayItem)
 } // updateVolume()
 
 export function selectColormap(gl, lutName = "") {
@@ -218,89 +220,128 @@ function makeLut(Rs, Gs, Bs, As, Is) {
 	return lut;
 } // makeLut()
 
-
-export function drawSlices(gl, overlayItem, a, c, s) {
+function sliceScale(gl, overlayItem) {
 	var hdr = overlayItem.volume.hdr
-	console.log("drawing slices")
-	gl.clearColor(backColor[0], backColor[1], backColor[2], backColor[3]);
-	//gl.clearColor(1.0, 1.0, 0.0, 0.0);
-	gl.clear(gl.COLOR_BUFFER_BIT);
-	console.log("viewport width ", gl.canvas.width)
-	console.log("viewport height ", gl.canvas.height)
-	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+	console.log("viewport (w,h):", gl.canvas.width, gl.canvas.height)
 	var dims = [1.0, hdr.dims[1] * hdr.pixDims[1], hdr.dims[2] * hdr.pixDims[2], hdr.dims[3] * hdr.pixDims[3]];
 	var longestAxis = Math.max(dims[1], Math.max(dims[2], dims[3]));
 	var volScale = [dims[1] / longestAxis, dims[2] / longestAxis, dims[3] / longestAxis];
-	console.log("volScale", volScale)
-	gl.canvas.style.backgroundColor = "black"
-	var xAR = gl.canvas.clientHeight / gl.canvas.clientWidth;
-	var yAR = 1.0;
-	if (xAR > 1.0) {
-		yAR = gl.canvas.clientWidth / gl.canvas.clientHeight;
-		xAR = 1.0;
+	console.log("volScale (x,y,z):", volScale)
+	//gl.canvas.style.backgroundColor = "black"
+	var AR = [gl.canvas.clientHeight / gl.canvas.clientWidth, 1.0];
+	if (AR[0] > 1.0) {
+		AR[1] = gl.canvas.clientWidth / gl.canvas.clientHeight;
+		AR[0] = 1.0;
 	}
-	console.log("xAR ", xAR)
-	console.log("yAR ", yAR)
-	sliceShader.use(gl);
+	console.log("Canvas aspect ratio (x,y):", AR[0], AR[1])
+	return { volScale, AR }
+}
 
-	console.log("drawing axial")
-	var w = volScale[0] * xAR;
-	var h = volScale[1] * yAR;
+export function mouseClick(gl, overlayItem, x, y) {
+	console.log("Click pixels (x,y):", x, y);
+	let {volScale, AR} = sliceScale(gl, overlayItem);
+	if ((gl.canvas.height < 1) || (AR[0] <= 0) || (AR[1] <= 0) || (volScale[0] <= 0) || (volScale[1] <= 0) || (volScale[2] <= 0)) return;
+	//mouse click X,Y in screen coordinates, origin at top left  
+	// webGL clip space L,R,T,B = [-1, 1, 1, 1] 
+	// n.b. webGL Y polarity reversed
+	// https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
+	var glx = ((x / gl.canvas.width) - 0.5) * 2.0;
+	var gly = (((gl.canvas.height - y) / (gl.canvas.height)) - 0.5) * 2.0;
+	console.log("Click clip space (x,y):", glx, gly);
+	//test axial
+	var w = volScale[0] * AR[0];
+	var h = volScale[1] * AR[1];
+	if ((glx >= -w) && (glx < 0.0) && (gly >= -h) && (gly < 0.0)) {
+		crosshairPos[0] = (glx + w) / w;
+		crosshairPos[1] = (gly + h) / h;
+		console.log("Axial click (x,y,z)", crosshairPos); //click defines x,y
+		drawSlices(gl, overlayItem);
+	}
+	//test coronal
+	w = volScale[0] * AR[0];
+	h = volScale[2] * AR[1];
+	if ((glx >= -w) && (glx < 0.0) && (gly > 0.0) && (gly < h)) {
+		crosshairPos[0] = (glx + w) / w;
+		crosshairPos[2] = (gly) / h;
+		console.log("Coronal click (x,y,z)", crosshairPos); //click defines x,z
+		drawSlices(gl, overlayItem);
+	}
+	//test sagittal
+	w = volScale[1] * AR[0];
+	h = volScale[2] * AR[1];
+	if ((glx > 0.0) && (glx < w) && (gly >= 0.0) && (gly < h)) {
+		crosshairPos[1] = (glx) / w;
+		crosshairPos[2] = (gly) / h;
+		console.log("Sagittal click (x,y,z)", crosshairPos); //click defines y,z
+		drawSlices(gl, overlayItem);
+	}	
+}
+
+export function drawSlices(gl, overlayItem) {
+	let {volScale, AR} = sliceScale(gl, overlayItem);
+	gl.clearColor(backColor[0], backColor[1], backColor[2], backColor[3]);
+	gl.clear(gl.COLOR_BUFFER_BIT);
+	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+	sliceShader.use(gl);
+	//draw axial
+	var w = volScale[0] * AR[0];
+	var h = volScale[1] * AR[1];
+	console.log("Axial (w,h):", w, h)
 	gl.uniform1i(sliceShader.uniforms["axCorSag"], 0);
-	gl.uniform1f(sliceShader.uniforms["slice"], a);
+	gl.uniform1f(sliceShader.uniforms["slice"], crosshairPos[2]);
 	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], -w, -h, w, h);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-
-	console.log("drawing coronal")
-	w = volScale[0] * xAR;
-	h = volScale[2] * yAR;
-
+	//draw coronal
+	w = volScale[0] * AR[0];
+	h = volScale[2] * AR[1];
+	console.log("Coronal (w,h):", w, h)
 	gl.uniform1i(sliceShader.uniforms["axCorSag"], 1);
-	gl.uniform1f(sliceShader.uniforms["slice"], c);
+	gl.uniform1f(sliceShader.uniforms["slice"], crosshairPos[1]);
 	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], -w, 0, w, h);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-
-	console.log("drawing sagittal")
-	w = volScale[1] * xAR;
-	h = volScale[2] * yAR;
+	//draw sagittal
+	w = volScale[1] * AR[0];
+	h = volScale[2] * AR[1];
+	console.log("Sagittal (w,h):", w, h)
 	gl.uniform1i(sliceShader.uniforms["axCorSag"], 2);
-	gl.uniform1f(sliceShader.uniforms["slice"], s);
+	gl.uniform1f(sliceShader.uniforms["slice"], crosshairPos[0]);
 	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], 0, 0, w, h);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 
 	if (crosshairWidth <= 0.0) {
-		//gl.finish()
+		gl.finish()
 		return;
 	}
+	var a = crosshairPos[2];
+	var c = crosshairPos[1];
+	var s = crosshairPos[0];
+	
 	lineShader.use(gl)
 	gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
-	console.log("drawing axial crosshairs")
-	w = volScale[0] * xAR;
-	h = volScale[1] * yAR;
+	//console.log("drawing axial crosshairs")
+	w = volScale[0] * AR[0];
+	h = volScale[1] * AR[1];
 	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w, -h+(c* h)-crosshairWidth, w, crosshairWidth);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w+(s* w)-crosshairWidth, -h, crosshairWidth, h);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 
-	console.log("drawing coronal crosshairs")
-	w = volScale[0] * xAR;
-	h = volScale[2] * yAR;
+	//console.log("drawing coronal crosshairs")
+	w = volScale[0] * AR[0];
+	h = volScale[2] * AR[1];
 	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w, 0+(a* h)-crosshairWidth, w, crosshairWidth);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w+(s* w)-crosshairWidth, 0, crosshairWidth, h);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 
-	console.log("drawing sagittal crosshairs")
-	w = volScale[1] * xAR;
-	h = volScale[2] * yAR;
+	//console.log("drawing sagittal crosshairs")
+	w = volScale[1] * AR[0];
+	h = volScale[2] * AR[1];
 	//gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w, h+(c* h)-crosshairWidth, w, crosshairWidth);
 	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], 0, 0+(a* h)-crosshairWidth, w, crosshairWidth);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], 0+(c* w)-crosshairWidth, 0, crosshairWidth, h);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-
-
-
 	// gl.viewport(gl.canvas.width / 2, 0, gl.canvas.width / 2, gl.canvas.height / 2);
 	// Wait for rendering to actually finish
 	gl.finish()
