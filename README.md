@@ -13,9 +13,12 @@ NiiVue is a minimalist webgl [nifti](https://nifti.nimh.nih.gov) image viewer (f
 The goal is to have a simple viewer component that can be embedded in an existing web page. The component can be simply embedded into any web page. Optionally, the component can be controlled by other widgets on the web page, for example controls that allow the user to set the contrast, color scheme and other properties. 
 
 
-## Example screen shot
+## Example screen shots
 
-![example image](example.png)
+![example image1](example1.png)
+
+![example image2](example2.png)
+
 
 ## Live View 
 
