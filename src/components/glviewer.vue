@@ -5,9 +5,6 @@
 import * as nv from "../niivue.js";
 import {bus} from "@/bus.js"
 
-bus.$on('slice-type-change', function (sliceType) {
-  nv.setSliceType(sliceType)
-});
 
 
 export default {
@@ -19,6 +16,12 @@ export default {
   props: {
     overlays: Array,
     shader: String,
+  },
+  created () {
+    bus.$on('slice-type-change', function (sliceType) {
+    nv.setSliceType(sliceType)
+});
+
   },
   data() {
     return {
@@ -62,13 +65,14 @@ export default {
       this.mouseDown = true
       var rect = canvas.getBoundingClientRect()
       nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
-
+      nv.setAzEl(e.clientX - rect.left,e.clientY - rect.top)
     })
 
     gl.canvas.addEventListener('mousemove', (e) => {
       if (this.mouseDown) {
         var rect = canvas.getBoundingClientRect()
         nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
+        nv.setAzEl(e.clientX - rect.left,e.clientY - rect.top)
       }
     })
 

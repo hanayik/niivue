@@ -51,7 +51,7 @@
     <v-footer app>
       <v-row >
         <v-col align="center" justify="center" >
-          coordinates: x, y, z
+          <span class='text-caption'>{{ coordinateString }}</span> 
         </v-col>
       </v-row>
     </v-footer>
@@ -64,6 +64,8 @@ import controls from './components/controls.vue'
 import glviewer from './components/glviewer.vue'
 import {bus} from "@/bus.js"
 
+
+
 export default {
   name: 'App',
 
@@ -72,10 +74,18 @@ export default {
     glviewer
   },
 
+  created () {
+    bus.$on('crosshair-pos-change', (posString) => {
+    this.coordinateString = posString 
+      console.log(posString)
+    });
+
+  },
   data (){
     return {
       tab: null,
       appTabs: ['Menu', 'Draw', 'Edit', 'Scripting'],
+      coordinateString: '0x0x0',
       overlayList: [
         {
           volumeURL: "./mni152.nii.gz",
@@ -87,7 +97,7 @@ export default {
           colorMap: "gray", // gray
           opacity: 100,
         },
-        {
+        /*{
           volumeURL: "./chris_T1.nii.gz",
           volume: {hdr: null, img: null},
           name: "chris_T1.nii.gz",
@@ -96,7 +106,7 @@ export default {
           intensityRange:[0, 100],
           colorMap: "gray", // gray
           opacity: 100,
-        }
+        }*/
       ]
     }
   },

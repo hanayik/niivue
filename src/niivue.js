@@ -5,6 +5,7 @@ import * as mat from "gl-matrix"; //
 import { vertSliceShader, fragSliceShader } from "./shader-srcs.js";
 import { vertLineShader, fragLineShader } from "./shader-srcs.js";
 import { vertRenderShader, fragRenderShader } from "./shader-srcs.js";
+import {bus} from "@/bus.js"
 
 export var crosshairWidth = 0.005;
 export var crosshairColor =  [1, 0, 0, 1];
@@ -35,9 +36,18 @@ var screenSlices = [ //location and type of each 2D slice on screen, allows clic
   {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial}
 ];
 
+export function setAzEl(az, el) {
+  if (sliceType == sliceTypeRender) {
+    renderAzimuth = az
+    renderElevation = el
+    drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
+  }
+}
+
 export function setSliceType(st) {
   sliceType = st
-  drawSlices(getGL(), _overlayItem)
+  drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
+
 }
 
 export function getGL() {
@@ -255,6 +265,10 @@ function sliceScale(gl, overlayItem) {
 }
 
 export function mouseClick(gl, overlayItem, x, y) {
+  if (sliceType == sliceTypeRender) {
+    return
+  }
+
 	console.log("Click pixels (x,y):", x, y);
 	let {volScale, AR} = sliceScale(gl, overlayItem);
 	if ((numScreenSlices < 1) || (gl.canvas.height < 1) || (AR[0] <= 0) || (AR[1] <= 0) || (volScale[0] <= 0) || (volScale[1] <= 0) || (volScale[2] <= 0)) return;
@@ -401,6 +415,9 @@ export function drawSlices(gl, overlayItem) {
 		draw2D(gl, [0, 0, w, h], 2);
 	}
 	gl.finish();
-	return crosshairPos[0].toFixed(2)+'×'+crosshairPos[1].toFixed(2)+'×'+crosshairPos[2].toFixed(2);
+  var posString = crosshairPos[0].toFixed(2)+'×'+crosshairPos[1].toFixed(2)+'×'+crosshairPos[2].toFixed(2);
+  // temporary event bus mechanism. It uses Vue, but it would be ideal to divorce vue from this gl code.
+  bus.$emit('crosshair-pos-change', posString);
+	return posString
 }
 
