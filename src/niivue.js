@@ -1,29 +1,47 @@
 // import * as glmat from "gl-matrix"
 import * as nii from "nifti-reader-js"
 import { Shader } from "./webgl-util/shader.js";
+import * as mat from "gl-matrix"; //
 import { vertSliceShader, fragSliceShader } from "./shader-srcs.js";
 import { vertLineShader, fragLineShader } from "./shader-srcs.js";
+import { vertRenderShader, fragRenderShader } from "./shader-srcs.js";
 
-export var colormapTexture = null
-export var volumeTexture = null
-export var sliceShader = null //program for 2D slice views
-export var lineShader = null //program for cross-hairs
 export var crosshairWidth = 0.005;
 export var crosshairColor =  [1, 0, 0, 1];
 export var crosshairPos = [0.5, 0.5, 0.5];
 export var backColor =  [0, 0, 0, 1];
+export const sliceTypeAxial = 0;
+export const sliceTypeCoronal = 1;
+export const sliceTypeSagittal = 2;
+export const sliceTypeMultiplanar = 3;
+export const sliceTypeRender = 4;
+export var sliceType = sliceTypeMultiplanar; //view: axial, coronal, sagittal, multiplanar or render
+export var renderElevation = 15;
+export var renderAzimuth = 30;
 
-//export var mouse = {x: -1, y:-1}
+var colormapTexture = null
+var volumeTexture = null
+var sliceShader = null //program for 2D slice views
+var lineShader = null //program for cross-hairs
+var renderShader = null //program for 3D views
+
+
+var numScreenSlices = 0; //e.g. for multiplanar view, 3 simultaneous slices: axial, coronal, sagittal
+var screenSlices = [ //location and type of each 2D slice on screen, allows clicking to detect position
+  {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial}, 
+  {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial},
+  {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial}, 
+  {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial}
+]; 
 
 export function getGL() {
-
   var gl = document.querySelector("#gl").getContext("webgl2")
   if (!gl) {
     return null
   }
   return gl
-
 }
+
 function scaleTo8Bit(A, overlayItem) {
   var volume = overlayItem.volume
 	var mn = volume.hdr.cal_min;
@@ -113,6 +131,7 @@ export function init(gl) {
 	gl.uniform1i(sliceShader.uniforms["volume"], 0);
 	gl.uniform1i(sliceShader.uniforms["colormap"], 1);
 	lineShader = new Shader(gl, vertLineShader, fragLineShader);
+	renderShader = new Shader(gl, vertRenderShader, fragRenderShader);
 }
 
 export function updateGLVolume(gl, overlayItem) { //load volume or change contrast
@@ -154,21 +173,7 @@ export function updateGLVolume(gl, overlayItem) { //load volume or change contra
 	gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
 	gl.texStorage3D(gl.TEXTURE_3D, 1, gl.R8, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
 	gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], gl.RED, gl.UNSIGNED_BYTE, img8);
-	/*
-	//Volume Rendering values:
-	var dims = [1.0, hdr.dims[1] * hdr.pixDims[1], hdr.dims[2] * hdr.pixDims[2], hdr.dims[3] * hdr.pixDims[3]];
-	var longestAxis = Math.max(dims[1], Math.max(dims[2], dims[3]));
-	var volScale = [dims[1] / longestAxis, dims[2] / longestAxis, dims[3] / longestAxis];
-	shader.use(gl)
-	gl.uniform3iv(shader.uniforms["volume_dims"], [hdr.dims[1], hdr.dims[2], hdr.dims[3]]);
-	gl.uniform3fv(shader.uniforms["volume_scale"], volScale);
-	*/
-	/*if (sliceShader)
-		gl.deleteShader(sliceShader);
-	sliceShader = new Shader(gl, vertSliceShader, fragSliceShader);
-	sliceShader.use(gl)
-	gl.uniform1i(sliceShader.uniforms["volume"], 0);
-	gl.uniform1i(sliceShader.uniforms["colormap"], 1);*/
+
 	drawSlices(gl, overlayItem)
 } // updateVolume()
 
@@ -227,7 +232,6 @@ function sliceScale(gl, overlayItem) {
 	var longestAxis = Math.max(dims[1], Math.max(dims[2], dims[3]));
 	var volScale = [dims[1] / longestAxis, dims[2] / longestAxis, dims[3] / longestAxis];
 	console.log("volScale (x,y,z):", volScale)
-	//gl.canvas.style.backgroundColor = "black"
 	var AR = [gl.canvas.clientHeight / gl.canvas.clientWidth, 1.0];
 	if (AR[0] > 1.0) {
 		AR[1] = gl.canvas.clientWidth / gl.canvas.clientHeight;
@@ -240,7 +244,7 @@ function sliceScale(gl, overlayItem) {
 export function mouseClick(gl, overlayItem, x, y) {
 	console.log("Click pixels (x,y):", x, y);
 	let {volScale, AR} = sliceScale(gl, overlayItem);
-	if ((gl.canvas.height < 1) || (AR[0] <= 0) || (AR[1] <= 0) || (volScale[0] <= 0) || (volScale[1] <= 0) || (volScale[2] <= 0)) return;
+	if ((numScreenSlices < 1) || (gl.canvas.height < 1) || (AR[0] <= 0) || (AR[1] <= 0) || (volScale[0] <= 0) || (volScale[1] <= 0) || (volScale[2] <= 0)) return;
 	//mouse click X,Y in screen coordinates, origin at top left  
 	// webGL clip space L,R,T,B = [-1, 1, 1, 1] 
 	// n.b. webGL Y polarity reversed
@@ -248,101 +252,131 @@ export function mouseClick(gl, overlayItem, x, y) {
 	var glx = ((x / gl.canvas.width) - 0.5) * 2.0;
 	var gly = (((gl.canvas.height - y) / (gl.canvas.height)) - 0.5) * 2.0;
 	console.log("Click clip space (x,y):", glx, gly);
-	//test axial
-	var w = volScale[0] * AR[0];
-	var h = volScale[1] * AR[1];
-	if ((glx >= -w) && (glx < 0.0) && (gly >= -h) && (gly < 0.0)) {
-		crosshairPos[0] = (glx + w) / w;
-		crosshairPos[1] = (gly + h) / h;
-		console.log("Axial click (x,y,z)", crosshairPos); //click defines x,y
-		drawSlices(gl, overlayItem);
+	for (let i = 0; i < numScreenSlices; i++) {
+		var axCorSag = screenSlices[i].axCorSag;
+		if (axCorSag > sliceTypeSagittal) continue;
+		var lbwh = screenSlices[i].leftBottomWidthHeight;
+		var fracX = (glx - lbwh[0]) / lbwh[2];
+		var fracY = (gly - lbwh[1]) / lbwh[3];
+		if ((fracX >= 0.0) && (fracX < 1.0) && (fracY >= 0.0) && (fracY < 1.0)) { //user clicked on slice i
+			if (axCorSag === sliceTypeAxial) {
+				crosshairPos[0] = fracX;
+				crosshairPos[1] = fracY;
+			}
+			if (axCorSag === sliceTypeCoronal) {
+				crosshairPos[0] = fracX;
+				crosshairPos[2] = fracY;
+			}
+			if (axCorSag === sliceTypeSagittal) {
+				crosshairPos[1] = fracX;
+				crosshairPos[2] = fracY;
+			}
+			drawSlices(gl, overlayItem);
+			return;
+		} //if click in slice i
+	} //for i: each slice on screen
+}
+
+function draw2D(gl, leftBottomWidthHeight, axCorSag) {
+	var crossXYZ = [crosshairPos[0], crosshairPos[1],crosshairPos[2]]; //axial: width=i, height=j, slice=k
+	if (axCorSag === 1) 
+		crossXYZ = [crosshairPos[0], crosshairPos[2],crosshairPos[1]]; //coronal: width=i, height=k, slice=j
+	if (axCorSag === 2) 
+		crossXYZ = [crosshairPos[1], crosshairPos[2],crosshairPos[0]]; //sagittal: width=j, height=k, slice=i	
+	sliceShader.use(gl);
+	gl.uniform1i(sliceShader.uniforms["axCorSag"], axCorSag);
+	gl.uniform1f(sliceShader.uniforms["slice"], crossXYZ[2]);
+	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], leftBottomWidthHeight[0], leftBottomWidthHeight[1], leftBottomWidthHeight[2], leftBottomWidthHeight[3]);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+	//record screenSlices to detect mouse click positions
+	screenSlices[numScreenSlices].leftBottomWidthHeight = leftBottomWidthHeight;
+	screenSlices[numScreenSlices].axCorSag = axCorSag;
+	numScreenSlices += 1;	
+	if (crosshairWidth <= 0.0) return;
+	lineShader.use(gl)
+	gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
+	//vertical line of crosshair:
+	var left = leftBottomWidthHeight[0] + (leftBottomWidthHeight[2] * crossXYZ[0]);
+	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], left - crosshairWidth, leftBottomWidthHeight[1],  crosshairWidth, leftBottomWidthHeight[3]);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+	//horizontal line of crosshair:
+	var bottom = leftBottomWidthHeight[1] + (leftBottomWidthHeight[3] * crossXYZ[1]);
+	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], leftBottomWidthHeight[0], bottom - crosshairWidth, leftBottomWidthHeight[2], crosshairWidth);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);	
+}
+
+function draw3D(gl, volScale) {
+	renderShader.use(gl);
+	if (gl.canvas.width < gl.canvas.height) { // screen aspect ratio
+			gl.viewport(0, (gl.canvas.height - gl.canvas.width)* 0.5, gl.canvas.width, gl.canvas.width);
+	} else {
+		gl.viewport((gl.canvas.width - gl.canvas.height)* 0.5, 0, gl.canvas.height, gl.canvas.height);
 	}
-	//test coronal
-	w = volScale[0] * AR[0];
-	h = volScale[2] * AR[1];
-	if ((glx >= -w) && (glx < 0.0) && (gly > 0.0) && (gly < h)) {
-		crosshairPos[0] = (glx + w) / w;
-		crosshairPos[2] = (gly) / h;
-		console.log("Coronal click (x,y,z)", crosshairPos); //click defines x,z
-		drawSlices(gl, overlayItem);
-	}
-	//test sagittal
-	w = volScale[1] * AR[0];
-	h = volScale[2] * AR[1];
-	if ((glx > 0.0) && (glx < w) && (gly >= 0.0) && (gly < h)) {
-		crosshairPos[1] = (glx) / w;
-		crosshairPos[2] = (gly) / h;
-		console.log("Sagittal click (x,y,z)", crosshairPos); //click defines y,z
-		drawSlices(gl, overlayItem);
-	}	
+	gl.clearColor(0.2, 0, 0, 1);
+	//todo:
+	// ray direction
+	var m = mat.mat4.create();
+	var fDistance = 0.1;
+	//modelMatrix *= TMat4.Translate(0, 0, -fDistance);
+	mat.mat4.translate(m,m, [0, 0, fDistance]);
+	// https://glmatrix.net/docs/module-mat4.html  https://glmatrix.net/docs/mat4.js.html
+	var rad = -(90-renderElevation-volScale[0]) * Math.PI / 180;
+	mat.mat4.rotate(m,m, rad, [-1, 0, 0]);
+	rad = (renderAzimuth) * Math.PI / 180;
+	mat.mat4.rotate(m,m, rad, [0, 0, 1]);
+	mat.mat4.scale(m, m, volScale); // volume aspect ratio
+	//compute ray direction
+	var inv = mat.mat4.create();
+	mat.mat4.invert(inv, m);
+	var rayDir4 = mat.vec4.fromValues(0,0,-1,1);
+	mat.vec4.transformMat4(rayDir4, rayDir4, inv);
+	var rayDir = mat.vec3.fromValues(rayDir4[0],rayDir4[1],rayDir4[2]);
+	gl.disable(gl.DEPTH_TEST);
+	gl.enable(gl.CULL_FACE);
+	gl.cullFace(gl.BACK);
+	//gl.enable(gl.BLEND);
+	//gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);	
+	gl.uniformMatrix4fv(renderShader.uniforms["mvpMtx"], false, m);
+	gl.uniform3fv(renderShader.uniforms["rayDir"], rayDir);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 14);//cube is 12 triangles, triangle-strip creates n-2 triangles
+	return 'azimuth: ' + renderAzimuth.toFixed(0)+' elevation: '+renderElevation.toFixed(0);
 }
 
 export function drawSlices(gl, overlayItem) {
-	let {volScale, AR} = sliceScale(gl, overlayItem);
 	gl.clearColor(backColor[0], backColor[1], backColor[2], backColor[3]);
 	gl.clear(gl.COLOR_BUFFER_BIT);
+	let {volScale, AR} = sliceScale(gl, overlayItem);
+	if (sliceType === sliceTypeRender) { //draw rendering
+		return draw3D(gl, volScale);
+	}
 	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-	sliceShader.use(gl);
-	//draw axial
 	var w = volScale[0] * AR[0];
 	var h = volScale[1] * AR[1];
-	console.log("Axial (w,h):", w, h)
-	gl.uniform1i(sliceShader.uniforms["axCorSag"], 0);
-	gl.uniform1f(sliceShader.uniforms["slice"], crosshairPos[2]);
-	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], -w, -h, w, h);
-	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-	//draw coronal
-	w = volScale[0] * AR[0];
-	h = volScale[2] * AR[1];
-	console.log("Coronal (w,h):", w, h)
-	gl.uniform1i(sliceShader.uniforms["axCorSag"], 1);
-	gl.uniform1f(sliceShader.uniforms["slice"], crosshairPos[1]);
-	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], -w, 0, w, h);
-	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-	//draw sagittal
-	w = volScale[1] * AR[0];
-	h = volScale[2] * AR[1];
-	console.log("Sagittal (w,h):", w, h)
-	gl.uniform1i(sliceShader.uniforms["axCorSag"], 2);
-	gl.uniform1f(sliceShader.uniforms["slice"], crosshairPos[0]);
-	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], 0, 0, w, h);
-	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-
-	if (crosshairWidth <= 0.0) {
-		gl.finish()
-		return;
+	numScreenSlices = 0;
+	screenSlices[0].leftBottomWidthHeight = [w,h,0,0,0];
+	if (sliceType === sliceTypeAxial) { //draw axial
+		draw2D(gl, [-w, -h, w*2, h*2], 0);
+	} else if (sliceType === sliceTypeCoronal) { //draw coronal
+		w = volScale[0] * AR[0];
+		h = volScale[2] * AR[1];
+		draw2D(gl, [-w, -h, w * 2, h * 2], 1)
+	} else if (sliceType === sliceTypeSagittal) { //draw sagittal
+		w = volScale[1] * AR[0];
+		h = volScale[2] * AR[1];
+		draw2D(gl, [-w, -h, w * 2, h * 2], 2);
+	} else { //sliceTypeMultiplanar
+		//draw axial
+		draw2D(gl, [-w, -h, w, h], 0);
+		//draw coronal
+		w = volScale[0] * AR[0];
+		h = volScale[2] * AR[1];
+		draw2D(gl, [-w, 0, w, h], 1);
+		//draw sagittal
+		w = volScale[1] * AR[0];
+		h = volScale[2] * AR[1];
+		draw2D(gl, [0, 0, w, h], 2);
 	}
-	var a = crosshairPos[2];
-	var c = crosshairPos[1];
-	var s = crosshairPos[0];
-	
-	lineShader.use(gl)
-	gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
-	//console.log("drawing axial crosshairs")
-	w = volScale[0] * AR[0];
-	h = volScale[1] * AR[1];
-	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w, -h+(c* h)-crosshairWidth, w, crosshairWidth);
-	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w+(s* w)-crosshairWidth, -h, crosshairWidth, h);
-	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-
-	//console.log("drawing coronal crosshairs")
-	w = volScale[0] * AR[0];
-	h = volScale[2] * AR[1];
-	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w, 0+(a* h)-crosshairWidth, w, crosshairWidth);
-	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w+(s* w)-crosshairWidth, 0, crosshairWidth, h);
-	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-
-	//console.log("drawing sagittal crosshairs")
-	w = volScale[1] * AR[0];
-	h = volScale[2] * AR[1];
-	//gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], -w, h+(c* h)-crosshairWidth, w, crosshairWidth);
-	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], 0, 0+(a* h)-crosshairWidth, w, crosshairWidth);
-	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], 0+(c* w)-crosshairWidth, 0, crosshairWidth, h);
-	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
-	// gl.viewport(gl.canvas.width / 2, 0, gl.canvas.width / 2, gl.canvas.height / 2);
-	// Wait for rendering to actually finish
-	gl.finish()
+	gl.finish();
+	return crosshairPos[0].toFixed(2)+'×'+crosshairPos[1].toFixed(2)+'×'+crosshairPos[2].toFixed(2);
 }
+
