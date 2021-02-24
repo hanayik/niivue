@@ -1,3 +1,25 @@
+export var vertRenderShader =
+`#version 300 es
+#line 434
+layout(location=0) in vec3 pos;
+uniform mat4 mvpMtx;
+out vec3 vColor;
+void main(void) {
+	gl_Position = mvpMtx * vec4((pos.xyz - 0.5), 1.0);
+	vColor = pos;
+}`;
+
+export var fragRenderShader =
+`#version 300 es
+#line 456
+precision highp int;
+precision highp float;
+uniform vec3 rayDir;
+in vec3 vColor;
+out vec4 fColor;
+void main() {
+	fColor = vec4(vColor, 1.0);
+}`;
 
 export var vertShader =
 `#version 300 es

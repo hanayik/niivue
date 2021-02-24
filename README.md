@@ -6,28 +6,32 @@
 - [Development Environment]()
 - [Usage]()
 
-# Overview
+## Overview
 
-NiiVue is a minimalist webgl [nifti]() image viewer (for now). 
+NiiVue is a minimalist webgl [nifti](https://nifti.nimh.nih.gov) image viewer (for now). 
 
-The goal is to have a simple viewer component that can be embedded in an existing web page. There are basic overlay settings such as brightness and opacity controls as well. 
+The goal is to have a simple viewer component that can be embedded in an existing web page. The component can be simply embedded into any web page. Optionally, the component can be controlled by other widgets on the web page, for example controls that allow the user to set the contrast, color scheme and other properties. 
 
-The documentation is incomplete, but will live in this repo once created.
 
-# Example result
+## Example screen shot
 
 ![example image](example.png)
 
-# TODO
+## Live View 
+
+[Load a NiiVue web page](https://hanayik.github.io/niivue/)
+
+## Requirements
+
+- WebGL2 enabled browser (Chrome, FireFox or Safari Technology Preview).
+
+## To Do
 
 - allow mouse based slice scrolling
 - allow overlays
+- volume rendering
 
-# References
-
-- https://github.com/rordenlab/MRIcroWeb
-
-# Contributors
+## Contributors
 
 - Taylor Hanayik
 - Chris Rorden
