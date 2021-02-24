@@ -15,9 +15,9 @@ export const sliceTypeCoronal = 1;
 export const sliceTypeSagittal = 2;
 export const sliceTypeMultiplanar = 3;
 export const sliceTypeRender = 4;
-export var sliceType = sliceTypeMultiplanar; //view: axial, coronal, sagittal, multiplanar or render
+export var sliceType = sliceTypeRender; //view: axial, coronal, sagittal, multiplanar or render
+export var renderAzimuth = 120;
 export var renderElevation = 15;
-export var renderAzimuth = 30;
 
 var colormapTexture = null
 var volumeTexture = null
@@ -132,6 +132,9 @@ export function init(gl) {
 	gl.uniform1i(sliceShader.uniforms["colormap"], 1);
 	lineShader = new Shader(gl, vertLineShader, fragLineShader);
 	renderShader = new Shader(gl, vertRenderShader, fragRenderShader);
+	renderShader.use(gl)
+	gl.uniform1i(renderShader.uniforms["volume"], 0);
+	gl.uniform1i(renderShader.uniforms["colormap"], 1);
 }
 
 export function updateGLVolume(gl, overlayItem) { //load volume or change contrast
@@ -173,7 +176,6 @@ export function updateGLVolume(gl, overlayItem) { //load volume or change contra
 	gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
 	gl.texStorage3D(gl.TEXTURE_3D, 1, gl.R8, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
 	gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], gl.RED, gl.UNSIGNED_BYTE, img8);
-
 	drawSlices(gl, overlayItem)
 } // updateVolume()
 
@@ -227,18 +229,19 @@ function makeLut(Rs, Gs, Bs, As, Is) {
 
 function sliceScale(gl, overlayItem) {
 	var hdr = overlayItem.volume.hdr
-	console.log("viewport (w,h):", gl.canvas.width, gl.canvas.height)
+	//console.log("viewport (w,h):", gl.canvas.width, gl.canvas.height)
 	var dims = [1.0, hdr.dims[1] * hdr.pixDims[1], hdr.dims[2] * hdr.pixDims[2], hdr.dims[3] * hdr.pixDims[3]];
 	var longestAxis = Math.max(dims[1], Math.max(dims[2], dims[3]));
 	var volScale = [dims[1] / longestAxis, dims[2] / longestAxis, dims[3] / longestAxis];
-	console.log("volScale (x,y,z):", volScale)
+	//console.log("volScale (x,y,z):", volScale)
 	var AR = [gl.canvas.clientHeight / gl.canvas.clientWidth, 1.0];
 	if (AR[0] > 1.0) {
 		AR[1] = gl.canvas.clientWidth / gl.canvas.clientHeight;
 		AR[0] = 1.0;
 	}
-	console.log("Canvas aspect ratio (x,y):", AR[0], AR[1])
-	return { volScale, AR }
+	//console.log("Canvas aspect ratio (x,y):", AR[0], AR[1])
+	var vox = [hdr.dims[1], hdr.dims[2], hdr.dims[3]];
+	return { volScale, AR, vox }
 }
 
 export function mouseClick(gl, overlayItem, x, y) {
@@ -305,22 +308,23 @@ function draw2D(gl, leftBottomWidthHeight, axCorSag) {
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);	
 }
 
-function draw3D(gl, volScale) {
+function draw3D(gl, overlayItem) {
+	/* eslint-disable */ 
+	let {volScale, AR, vox} = sliceScale(gl, overlayItem);
+	/* eslint-enable */
 	renderShader.use(gl);
-	if (gl.canvas.width < gl.canvas.height) { // screen aspect ratio
+	if (gl.canvas.width < gl.canvas.height) // screen aspect ratio
 			gl.viewport(0, (gl.canvas.height - gl.canvas.width)* 0.5, gl.canvas.width, gl.canvas.width);
-	} else {
+	else
 		gl.viewport((gl.canvas.width - gl.canvas.height)* 0.5, 0, gl.canvas.height, gl.canvas.height);
-	}
+	
 	gl.clearColor(0.2, 0, 0, 1);
-	//todo:
-	// ray direction
 	var m = mat.mat4.create();
 	var fDistance = 0.1;
 	//modelMatrix *= TMat4.Translate(0, 0, -fDistance);
 	mat.mat4.translate(m,m, [0, 0, fDistance]);
 	// https://glmatrix.net/docs/module-mat4.html  https://glmatrix.net/docs/mat4.js.html
-	var rad = -(90-renderElevation-volScale[0]) * Math.PI / 180;
+	var rad = (90-renderElevation-volScale[0]) * Math.PI / 180;
 	mat.mat4.rotate(m,m, rad, [-1, 0, 0]);
 	rad = (renderAzimuth) * Math.PI / 180;
 	mat.mat4.rotate(m,m, rad, [0, 0, 1]);
@@ -331,24 +335,34 @@ function draw3D(gl, volScale) {
 	var rayDir4 = mat.vec4.fromValues(0,0,-1,1);
 	mat.vec4.transformMat4(rayDir4, rayDir4, inv);
 	var rayDir = mat.vec3.fromValues(rayDir4[0],rayDir4[1],rayDir4[2]);
+	mat.vec3.normalize(rayDir, rayDir);
+	//defuzz
+	const tiny = 0.00001;
+	if (Math.abs(rayDir[0]) < tiny) rayDir[0] = tiny;
+	if (Math.abs(rayDir[1]) < tiny) rayDir[1] = tiny;
+	if (Math.abs(rayDir[2]) < tiny) rayDir[2] = tiny;
+	//console.log( ">>", renderAzimuth, " : ", renderElevation, ">>>> ", rayDir);
 	gl.disable(gl.DEPTH_TEST);
 	gl.enable(gl.CULL_FACE);
-	gl.cullFace(gl.BACK);
+	gl.cullFace(gl.FRONT);
+	//gl.cullFace(gl.BACK);
 	//gl.enable(gl.BLEND);
 	//gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);	
 	gl.uniformMatrix4fv(renderShader.uniforms["mvpMtx"], false, m);
 	gl.uniform3fv(renderShader.uniforms["rayDir"], rayDir);
+	gl.uniform3fv(renderShader.uniforms["texVox"], vox);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 14);//cube is 12 triangles, triangle-strip creates n-2 triangles
 	return 'azimuth: ' + renderAzimuth.toFixed(0)+' elevation: '+renderElevation.toFixed(0);
 }
 
 export function drawSlices(gl, overlayItem) {
+	console.log(overlayItem.volumeURL);
 	gl.clearColor(backColor[0], backColor[1], backColor[2], backColor[3]);
 	gl.clear(gl.COLOR_BUFFER_BIT);
-	let {volScale, AR} = sliceScale(gl, overlayItem);
 	if (sliceType === sliceTypeRender) { //draw rendering
-		return draw3D(gl, volScale);
+		return draw3D(gl, overlayItem);
 	}
+	let {volScale, AR} = sliceScale(gl, overlayItem);
 	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 	var w = volScale[0] * AR[0];
 	var h = volScale[1] * AR[1];
