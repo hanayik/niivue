@@ -22,7 +22,8 @@ export default {
   },
   data() {
     return {
-      selectedOverlay: 0
+      selectedOverlay: 0,
+      mouseDown: false,
     };
   },
   watch: {
@@ -58,12 +59,24 @@ export default {
     const canvas = document.querySelector("#gl");
     const gl = canvas.getContext("webgl2");
     gl.canvas.addEventListener('mousedown', (e) => {
-      const rect = canvas.getBoundingClientRect()
-      //nv.mouse.x = e.clientX - rect.left
-      //nv.mouse.y = e.clientY - rect.top
+      this.mouseDown = true
+      var rect = canvas.getBoundingClientRect()
       nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
-      //console.log(nv.mouse)
+
     })
+
+    gl.canvas.addEventListener('mousemove', (e) => {
+      if (this.mouseDown) {
+        var rect = canvas.getBoundingClientRect()
+        nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
+      }
+    })
+
+    gl.canvas.addEventListener('mouseup', () => {
+      this.mouseDown = false
+    })
+
+
 
     window.addEventListener('resize', this.onWindowResize)
     this.gl = gl;
