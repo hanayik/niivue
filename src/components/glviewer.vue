@@ -3,6 +3,12 @@
 </template>
 <script>
 import * as nv from "../niivue.js";
+import {bus} from "@/bus.js"
+
+bus.$on('slice-type-change', function (sliceType) {
+  nv.setSliceType(sliceType)
+});
+
 
 export default {
   name: "glviewer",
@@ -25,8 +31,8 @@ export default {
     overlays: {
       deep: true,
       handler () {
-        nv.selectColormap(this.gl, this.overlays[this.selectedOverlay].colorMap)
-        nv.updateGLVolume(this.gl, this.overlays[this.selectedOverlay])
+        //nv.selectColormap(this.gl, this.overlays[this.selectedOverlay].colorMap)
+        //nv.updateGLVolume(this.gl, this.overlays[this.selectedOverlay])
     },
 
     }
@@ -67,6 +73,7 @@ export default {
     this.gl.blendFunc(this.gl.ONE, this.gl.ONE_MINUS_SRC_ALPHA);
     nv.init(this.gl);
     nv.loadVolume(this.overlays[this.selectedOverlay]); // just load first overlay. addtional overlays are not handled yet
+
 
   },
 };

@@ -15,9 +15,10 @@ export const sliceTypeCoronal = 1;
 export const sliceTypeSagittal = 2;
 export const sliceTypeMultiplanar = 3;
 export const sliceTypeRender = 4;
-export var sliceType = sliceTypeRender; //view: axial, coronal, sagittal, multiplanar or render
+export var sliceType = sliceTypeMultiplanar; //view: axial, coronal, sagittal, multiplanar or render
 export var renderAzimuth = 120;
 export var renderElevation = 15;
+var _overlayItem = null
 
 var colormapTexture = null
 var volumeTexture = null
@@ -28,11 +29,16 @@ var renderShader = null //program for 3D views
 
 var numScreenSlices = 0; //e.g. for multiplanar view, 3 simultaneous slices: axial, coronal, sagittal
 var screenSlices = [ //location and type of each 2D slice on screen, allows clicking to detect position
-  {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial}, 
   {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial},
-  {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial}, 
+  {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial},
+  {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial},
   {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial}
-]; 
+];
+
+export function setSliceType(st) {
+  sliceType = st
+  drawSlices(getGL(), _overlayItem)
+}
 
 export function getGL() {
   var gl = document.querySelector("#gl").getContext("webgl2")
@@ -117,6 +123,10 @@ export function loadVolume(overlayItem) {
 		}
 		overlayItem.volume.hdr = hdr
 		overlayItem.volume.img = img
+    _overlayItem = overlayItem
+    selectColormap(getGL(), overlayItem.colorMap)
+    updateGLVolume(getGL(), overlayItem)
+
 
 	};
 	req.send();
@@ -248,8 +258,8 @@ export function mouseClick(gl, overlayItem, x, y) {
 	console.log("Click pixels (x,y):", x, y);
 	let {volScale, AR} = sliceScale(gl, overlayItem);
 	if ((numScreenSlices < 1) || (gl.canvas.height < 1) || (AR[0] <= 0) || (AR[1] <= 0) || (volScale[0] <= 0) || (volScale[1] <= 0) || (volScale[2] <= 0)) return;
-	//mouse click X,Y in screen coordinates, origin at top left  
-	// webGL clip space L,R,T,B = [-1, 1, 1, 1] 
+	//mouse click X,Y in screen coordinates, origin at top left
+	// webGL clip space L,R,T,B = [-1, 1, 1, 1]
 	// n.b. webGL Y polarity reversed
 	// https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
 	var glx = ((x / gl.canvas.width) - 0.5) * 2.0;
@@ -282,10 +292,10 @@ export function mouseClick(gl, overlayItem, x, y) {
 
 function draw2D(gl, leftBottomWidthHeight, axCorSag) {
 	var crossXYZ = [crosshairPos[0], crosshairPos[1],crosshairPos[2]]; //axial: width=i, height=j, slice=k
-	if (axCorSag === 1) 
+	if (axCorSag === 1)
 		crossXYZ = [crosshairPos[0], crosshairPos[2],crosshairPos[1]]; //coronal: width=i, height=k, slice=j
-	if (axCorSag === 2) 
-		crossXYZ = [crosshairPos[1], crosshairPos[2],crosshairPos[0]]; //sagittal: width=j, height=k, slice=i	
+	if (axCorSag === 2)
+		crossXYZ = [crosshairPos[1], crosshairPos[2],crosshairPos[0]]; //sagittal: width=j, height=k, slice=i
 	sliceShader.use(gl);
 	gl.uniform1i(sliceShader.uniforms["axCorSag"], axCorSag);
 	gl.uniform1f(sliceShader.uniforms["slice"], crossXYZ[2]);
@@ -294,7 +304,7 @@ function draw2D(gl, leftBottomWidthHeight, axCorSag) {
 	//record screenSlices to detect mouse click positions
 	screenSlices[numScreenSlices].leftBottomWidthHeight = leftBottomWidthHeight;
 	screenSlices[numScreenSlices].axCorSag = axCorSag;
-	numScreenSlices += 1;	
+	numScreenSlices += 1;
 	if (crosshairWidth <= 0.0) return;
 	lineShader.use(gl)
 	gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
@@ -305,11 +315,11 @@ function draw2D(gl, leftBottomWidthHeight, axCorSag) {
 	//horizontal line of crosshair:
 	var bottom = leftBottomWidthHeight[1] + (leftBottomWidthHeight[3] * crossXYZ[1]);
 	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], leftBottomWidthHeight[0], bottom - crosshairWidth, leftBottomWidthHeight[2], crosshairWidth);
-	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);	
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 }
 
 function draw3D(gl, overlayItem) {
-	/* eslint-disable */ 
+	/* eslint-disable */
 	let {volScale, AR, vox} = sliceScale(gl, overlayItem);
 	/* eslint-enable */
 	renderShader.use(gl);
@@ -317,7 +327,7 @@ function draw3D(gl, overlayItem) {
 			gl.viewport(0, (gl.canvas.height - gl.canvas.width)* 0.5, gl.canvas.width, gl.canvas.width);
 	else
 		gl.viewport((gl.canvas.width - gl.canvas.height)* 0.5, 0, gl.canvas.height, gl.canvas.height);
-	
+
 	gl.clearColor(0.2, 0, 0, 1);
 	var m = mat.mat4.create();
 	var fDistance = 0.1;
@@ -347,7 +357,7 @@ function draw3D(gl, overlayItem) {
 	gl.cullFace(gl.FRONT);
 	//gl.cullFace(gl.BACK);
 	//gl.enable(gl.BLEND);
-	//gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);	
+	//gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 	gl.uniformMatrix4fv(renderShader.uniforms["mvpMtx"], false, m);
 	gl.uniform3fv(renderShader.uniforms["rayDir"], rayDir);
 	gl.uniform3fv(renderShader.uniforms["texVox"], vox);

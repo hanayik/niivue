@@ -89,6 +89,7 @@
 
 <script>
 import draggable from "vuedraggable";
+//import {bus} from "@/bus.js"
 
 export default {
   props: {
@@ -113,7 +114,7 @@ export default {
 
   methods: {
     toggleEye: function() {
-      this.eyeIcon = this.eyeIcon == "mdi-eye" ? "mdi-eye-off" : "mdi-eye"
+      this.eyeIcon = "mdi-eye" //this.eyeIcon == "mdi-eye" ? "mdi-eye-off" : "mdi-eye"
     },
 
     onColorChange: function(event, idx) {

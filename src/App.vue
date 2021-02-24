@@ -1,13 +1,41 @@
 <template>
   <v-app>
-    <v-app-bar app>
-      Toolbar
-    </v-app-bar>
+    <v-toolbar>
+      <v-tabs v-model='tab'>
+        <v-tabs-slider color='black'></v-tabs-slider>
+        <v-tab
+          v-for='item in appTabs'
+          :key='item'>
+          {{ item }}
+        </v-tab>
+      </v-tabs>
+      <v-spacer>
+      </v-spacer>
+      <v-btn @click='setSliceType(0)'>A</v-btn>
+      <v-btn @click='setSliceType(2)'>S</v-btn>
+      <v-btn @click='setSliceType(1)'>C</v-btn>
+      <v-btn @click='setSliceType(4)'>R</v-btn>
+      <v-btn @click='setSliceType(3)'>MP</v-btn>
+    </v-toolbar>
 
     <v-main>
       <v-row>
       <!-- app uses a 12 column layout, so the controls take up 4 columns on the left of the screen -->
       <v-col cols="4">
+        <!-- 
+        <v-tab-items v-model='tab'>
+          <v-tab-item
+            v-for='item in appTabs'
+            :key='item'>
+            <v-card>
+              <v-card-text>
+                test
+              </v-card-text>
+            </v-card>
+          </v-tab-item>
+        </v-tab-items>
+        -->
+
         <controls :overlays="overlayList">
         </controls>
       </v-col>
@@ -25,10 +53,6 @@
         <v-col align="center" justify="center" >
           coordinates: x, y, z
         </v-col>
-        <v-col align="center" justify="center" >
-          region: N/A
-        </v-col>
-
       </v-row>
     </v-footer>
 
@@ -38,6 +62,7 @@
 <script>
 import controls from './components/controls.vue'
 import glviewer from './components/glviewer.vue'
+import {bus} from "@/bus.js"
 
 export default {
   name: 'App',
@@ -49,6 +74,8 @@ export default {
 
   data (){
     return {
+      tab: null,
+      appTabs: ['Menu', 'Draw', 'Edit', 'Scripting'],
       overlayList: [
         {
           volumeURL: "./mni152.nii.gz",
@@ -71,6 +98,13 @@ export default {
           opacity: 100,
         }
       ]
+    }
+  },
+
+  methods: {
+    setSliceType: function(sliceType) {
+
+      bus.$emit('slice-type-change', sliceType);
     }
   },
 };
