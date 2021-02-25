@@ -129,3 +129,28 @@ out vec4 color;
 void main() {
 	color = lineColor;
 }`;
+
+export var vertColorbarShader =
+`#version 300 es
+#line 136
+layout(location=0) in vec3 pos;
+uniform vec4 leftBottomWidthHeight;
+out float vColor;
+void main(void) {
+	gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
+	gl_Position.x = leftBottomWidthHeight.x + (pos.x * leftBottomWidthHeight.b);
+	gl_Position.y = leftBottomWidthHeight.y + (pos.y * leftBottomWidthHeight.a);
+	vColor = pos.x;
+}`;
+
+export var fragColorbarShader =
+`#version 300 es
+#line 149
+precision highp int;
+precision highp float;
+uniform highp sampler2D colormap;
+in float vColor;
+out vec4 color;
+void main() {
+	color = vec4(texture(colormap, vec2(vColor, 0.5)).rgb, 1.0);
+}`;
