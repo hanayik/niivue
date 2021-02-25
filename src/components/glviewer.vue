@@ -1,5 +1,13 @@
 <template>
-  <div id="viewer" ></div>
+  <div id="viewer" >
+    <v-dialog
+      v-model="dialog"
+      max-width="200">
+      <v-color-picker mode='rgba' v-model="crosshairColor" @input="onCrosshairColorChange">
+      </v-color-picker>
+    </v-dialog>
+   
+  </div>
 </template>
 <script>
 import * as nv from "../niivue.js";
@@ -23,12 +31,15 @@ export default {
 });
 
   },
+  
   data() {
     return {
       selectedOverlay: 0,
       mouseDown: false,
       zDown: false,
-      scale: 1
+      scale: 1,
+      dialog: false,
+      crosshairColor: { r: 255, g: 0, b: 0, a: 1 }
     };
   },
   watch: {
@@ -51,7 +62,13 @@ export default {
       canvas.width = viewer.offsetWidth-1
       canvas.height = viewer.offsetHeight-1
       nv.drawSlices(this.gl, this.overlays[this.selectedOverlay])
+    },
+
+    onCrosshairColorChange: function() {
+      var floatColor = [this.crosshairColor.r/255, this.crosshairColor.g/255, this.crosshairColor.b/255, this.crosshairColor.a]
+      nv.setCrosshairColor(floatColor)
     }
+
   },
   mounted() {
     // get the gl context after the component has been mounted and initialized
@@ -63,12 +80,16 @@ export default {
     viewer.appendChild(glEl)
     const canvas = document.querySelector("#gl");
     const gl = canvas.getContext("webgl2");
+
     gl.canvas.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      this.dialog = false
       this.mouseDown = true
       var rect = canvas.getBoundingClientRect()
       nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
       nv.mouseDown(e.clientX - rect.left,e.clientY - rect.top)
     })
+
     gl.canvas.addEventListener('mousemove', (e) => {
       if (this.mouseDown) {
         var rect = canvas.getBoundingClientRect()
@@ -90,6 +111,12 @@ export default {
       this.mouseDown = false
     })
 
+    gl.canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault()
+      this.dialog = true
+    })
+
+
     window.addEventListener('keypress', (e) => {
       if (e.key === 'z') {
         this.zDown = true
@@ -107,10 +134,13 @@ export default {
     this.gl.enable(this.gl.CULL_FACE);
     this.gl.cullFace(this.gl.FRONT);
     this.gl.enable(this.gl.BLEND);
-    this.gl.blendFunc(this.gl.ONE, this.gl.ONE_MINUS_SRC_ALPHA);
+    this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
     nv.init(this.gl);
     nv.loadVolume(this.overlays[this.selectedOverlay]); // just load first overlay. addtional overlays are not handled yet
 
+    bus.$on('opacity-change', (opacity) => {
+      nv.setSliceOpacity(opacity)
+    });
 
   },
 };
