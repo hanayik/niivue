@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <v-toolbar>
+    <v-app-bar app>
       <v-tabs v-model='tab'>
         <v-tabs-slider color='black'></v-tabs-slider>
         <v-tab
@@ -16,26 +16,12 @@
       <v-btn @click='setSliceType(1)'>C</v-btn>
       <v-btn @click='setSliceType(4)'>R</v-btn>
       <v-btn @click='setSliceType(3)'>MP</v-btn>
-    </v-toolbar>
+    </v-app-bar>
 
     <v-main>
       <v-row>
       <!-- app uses a 12 column layout, so the controls take up 4 columns on the left of the screen -->
       <v-col cols="4">
-        <!-- 
-        <v-tab-items v-model='tab'>
-          <v-tab-item
-            v-for='item in appTabs'
-            :key='item'>
-            <v-card>
-              <v-card-text>
-                test
-              </v-card-text>
-            </v-card>
-          </v-tab-item>
-        </v-tab-items>
-        -->
-
         <controls :overlays="overlayList">
         </controls>
       </v-col>
