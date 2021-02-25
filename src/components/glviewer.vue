@@ -27,6 +27,8 @@ export default {
     return {
       selectedOverlay: 0,
       mouseDown: false,
+      zDown: false,
+      scale: 1
     };
   },
   watch: {
@@ -75,9 +77,19 @@ export default {
       }
     })
 
+    gl.canvas.addEventListener('wheel', (e) => {
+      if (this.zDown) {
+        e.preventDefault()
+        this.scale += e.deltaY * -0.01
+        nv.setScale(this.scale)
+      }
+      
+    })
+
     gl.canvas.addEventListener('mouseup', () => {
       this.mouseDown = false
     })
+
     window.addEventListener('resize', this.onWindowResize)
     this.gl = gl;
     this.gl.enable(this.gl.CULL_FACE);

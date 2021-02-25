@@ -18,6 +18,7 @@ export const sliceTypeRender = 4;
 export var sliceType = sliceTypeRender; //view: axial, coronal, sagittal, multiplanar or render
 export var renderAzimuth = 120;
 export var renderElevation = 15;
+var volScaleMultiplier = 1;
 var _overlayItem = null
 
 var colormapTexture = null
@@ -51,6 +52,12 @@ export function setSliceType(st) {
   sliceType = st
   drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
 } // setSliceType()
+
+export function setScale(scale) {
+  volScaleMultiplier = scale
+  drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
+
+}
 
 export function getGL() {
   var gl = document.querySelector("#gl").getContext("webgl2")
@@ -251,6 +258,7 @@ function sliceScale(gl, overlayItem) {
 	var dims = [1.0, hdr.dims[1] * hdr.pixDims[1], hdr.dims[2] * hdr.pixDims[2], hdr.dims[3] * hdr.pixDims[3]];
 	var longestAxis = Math.max(dims[1], Math.max(dims[2], dims[3]));
 	var volScale = [dims[1] / longestAxis, dims[2] / longestAxis, dims[3] / longestAxis];
+  volScale = volScale.map(function(v) {return v * volScaleMultiplier;})
 	//console.log("volScale (x,y,z):", volScale)
 	var AR = [gl.canvas.clientHeight / gl.canvas.clientWidth, 1.0];
 	if (AR[0] > 1.0) {
