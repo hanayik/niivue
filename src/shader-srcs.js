@@ -5,13 +5,13 @@ layout(location=0) in vec3 pos;
 uniform mat4 mvpMtx;
 out vec3 vColor;
 void main(void) {
-	gl_Position = mvpMtx * vec4((pos.xyz - 0.5), 1.0);
+	gl_Position = mvpMtx * vec4(2.0 * (pos.xyz - 0.5), 1.0);
 	vColor = pos;
 }`;
 
 export var fragRenderShader =
 `#version 300 es
-#line 14
+#line 15
 precision highp int;
 precision highp float;
 uniform vec3 rayDir;
@@ -73,7 +73,6 @@ void main() {
 	}
 	colAcc.a = colAcc.a / earlyTermination;
 	fColor = colAcc;
-	//fColor = vec4(backPosition, 1.0); return;
 }`;
 
 export var vertSliceShader =
@@ -98,7 +97,7 @@ void main(void) {
 
 export var fragSliceShader =
 `#version 300 es
-#line 102
+#line 100
 precision highp int;
 precision highp float;
 uniform highp sampler3D volume;
@@ -106,16 +105,12 @@ uniform highp sampler2D colormap;
 in vec3 texPos;
 out vec4 color;
 void main() {
-    //color = vec4(texPos, 1.0); //show texture sample location
-    //color = texture(volume, texPos); //show color index
-    float val = texture(volume, texPos).r;
-	//color = texture(colormap, vec2(val, 0.5)); //apply color scheme, use texture Alpha
-	color = vec4(texture(colormap, vec2(val, 0.5)).rgb, 1.0); //apply color scheme, use texture Alpha	
+	color = vec4(texture(colormap, vec2(texture(volume, texPos).r, 0.5)).rgb, 1.0);
 }`;
 
 export var vertLineShader =
 `#version 300 es
-#line 119
+#line 114
 layout(location=0) in vec3 pos;
 uniform vec4 leftBottomWidthHeight;
 void main(void) {
@@ -126,12 +121,11 @@ void main(void) {
 
 export var fragLineShader =
 `#version 300 es
-#line 130
+#line 125
 precision highp int;
 precision highp float;
 uniform vec4 lineColor;
 out vec4 color;
 void main() {
 	color = lineColor;
-	//color = vec4(1.0, 0.0, 0.0, 1.0);	
 }`;

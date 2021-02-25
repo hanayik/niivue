@@ -1,7 +1,6 @@
-// import * as glmat from "gl-matrix"
 import * as nii from "nifti-reader-js"
 import { Shader } from "./webgl-util/shader.js";
-import * as mat from "gl-matrix"; //
+import * as mat from "gl-matrix";
 import { vertSliceShader, fragSliceShader } from "./shader-srcs.js";
 import { vertLineShader, fragLineShader } from "./shader-srcs.js";
 import { vertRenderShader, fragRenderShader } from "./shader-srcs.js";
@@ -16,7 +15,7 @@ export const sliceTypeCoronal = 1;
 export const sliceTypeSagittal = 2;
 export const sliceTypeMultiplanar = 3;
 export const sliceTypeRender = 4;
-export var sliceType = sliceTypeMultiplanar; //view: axial, coronal, sagittal, multiplanar or render
+export var sliceType = sliceTypeRender; //view: axial, coronal, sagittal, multiplanar or render
 export var renderAzimuth = 120;
 export var renderElevation = 15;
 var _overlayItem = null
@@ -26,8 +25,7 @@ var volumeTexture = null
 var sliceShader = null //program for 2D slice views
 var lineShader = null //program for cross-hairs
 var renderShader = null //program for 3D views
-
-
+var mousePos = [0,0];
 var numScreenSlices = 0; //e.g. for multiplanar view, 3 simultaneous slices: axial, coronal, sagittal
 var screenSlices = [ //location and type of each 2D slice on screen, allows clicking to detect position
   {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial},
@@ -36,19 +34,23 @@ var screenSlices = [ //location and type of each 2D slice on screen, allows clic
   {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial}
 ];
 
-export function setAzEl(az, el) {
-  if (sliceType == sliceTypeRender) {
-    renderAzimuth = az
-    renderElevation = el
-    drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
-  }
-}
+export function mouseDown(x, y) {
+	if (sliceType != sliceTypeRender) return;
+	mousePos = [x,y];
+} // mouseDown()
+
+export function mouseMove(x, y) {
+	if (sliceType != sliceTypeRender) return;
+	renderAzimuth += x - mousePos[0];
+	renderElevation += y - mousePos[1];
+	mousePos = [x,y];
+	drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
+} // mouseMove()
 
 export function setSliceType(st) {
   sliceType = st
   drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
-
-}
+} // setSliceType()
 
 export function getGL() {
   var gl = document.querySelector("#gl").getContext("webgl2")
@@ -56,7 +58,7 @@ export function getGL() {
     return null
   }
   return gl
-}
+} // getGL()
 
 function scaleTo8Bit(A, overlayItem) {
   var volume = overlayItem.volume
@@ -73,7 +75,7 @@ function scaleTo8Bit(A, overlayItem) {
 		img8[i] = (v - mn) * scale;
 	}
 	return img8 // return scaled
-}
+} // scaleTo8Bit()
 
 export function calibrateIntensity(A, overlayItem) {
   var volume = overlayItem.volume
@@ -103,19 +105,18 @@ export function calibrateIntensity(A, overlayItem) {
 		volume.hdr.cal_min = mn;
 		volume.hdr.cal_max = mx;
 	}
-}
+} // calibrateIntensity()
 
 export function loadVolume(overlayItem) {
 	var hdr = null
 	var img = null
-  var url = overlayItem.volumeURL
-	// var volume = Object
+	var url = overlayItem.volumeURL
 	var req = new XMLHttpRequest();
 	req.open("GET", url, true);
 	req.responseType = "arraybuffer";
 	req.onerror = function () {
 		console.log = "Error Loading Volume";
-	};
+	}
 	req.onload = function () {
 		var dataBuffer = req.response;
 		if (dataBuffer) {
@@ -125,7 +126,6 @@ export function loadVolume(overlayItem) {
 			} else {
 				img = nii.readImage(hdr, dataBuffer);
 			}
-			//img = new Uint8Array(img);
 		} else {
 
 			alert("Unable to load buffer properly from volume?");
@@ -133,15 +133,13 @@ export function loadVolume(overlayItem) {
 		}
 		overlayItem.volume.hdr = hdr
 		overlayItem.volume.img = img
-    _overlayItem = overlayItem
-    selectColormap(getGL(), overlayItem.colorMap)
-    updateGLVolume(getGL(), overlayItem)
-
-
+		_overlayItem = overlayItem
+		selectColormap(getGL(), overlayItem.colorMap)
+		updateGLVolume(getGL(), overlayItem)
 	};
 	req.send();
 	return
-}
+} // loadVolume()
 
 export function init(gl) {
 	//initial setup: only at the startup of the component
@@ -155,7 +153,7 @@ export function init(gl) {
 	renderShader.use(gl)
 	gl.uniform1i(renderShader.uniforms["volume"], 0);
 	gl.uniform1i(renderShader.uniforms["colormap"], 1);
-}
+} // init()
 
 export function updateGLVolume(gl, overlayItem) { //load volume or change contrast
 	var cubeStrip = [0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0];
@@ -262,23 +260,21 @@ function sliceScale(gl, overlayItem) {
 	//console.log("Canvas aspect ratio (x,y):", AR[0], AR[1])
 	var vox = [hdr.dims[1], hdr.dims[2], hdr.dims[3]];
 	return { volScale, AR, vox }
-}
+} // sliceScale()
 
 export function mouseClick(gl, overlayItem, x, y) {
-  if (sliceType == sliceTypeRender) {
-    return
-  }
-
-	console.log("Click pixels (x,y):", x, y);
+	if (sliceType === sliceTypeRender)
+		return
+	//console.log("Click pixels (x,y):", x, y);
 	let {volScale, AR} = sliceScale(gl, overlayItem);
-	if ((numScreenSlices < 1) || (gl.canvas.height < 1) || (AR[0] <= 0) || (AR[1] <= 0) || (volScale[0] <= 0) || (volScale[1] <= 0) || (volScale[2] <= 0)) return;
+	if ((numScreenSlices < 1) || (gl.canvas.height < 1) || (AR[0] <= 0) || (AR[1] <= 0) || (volScale[0] <= 0) || (volScale[1] <= 0) || (volScale[2] <= 0)) 		return;
 	//mouse click X,Y in screen coordinates, origin at top left
 	// webGL clip space L,R,T,B = [-1, 1, 1, 1]
 	// n.b. webGL Y polarity reversed
 	// https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
 	var glx = ((x / gl.canvas.width) - 0.5) * 2.0;
 	var gly = (((gl.canvas.height - y) / (gl.canvas.height)) - 0.5) * 2.0;
-	console.log("Click clip space (x,y):", glx, gly);
+	//console.log("Click clip space (x,y):", glx, gly);
 	for (let i = 0; i < numScreenSlices; i++) {
 		var axCorSag = screenSlices[i].axCorSag;
 		if (axCorSag > sliceTypeSagittal) continue;
@@ -302,7 +298,7 @@ export function mouseClick(gl, overlayItem, x, y) {
 			return;
 		} //if click in slice i
 	} //for i: each slice on screen
-}
+} // mouseClick()
 
 function draw2D(gl, leftBottomWidthHeight, axCorSag) {
 	var crossXYZ = [crosshairPos[0], crosshairPos[1],crosshairPos[2]]; //axial: width=i, height=j, slice=k
@@ -341,10 +337,9 @@ function draw3D(gl, overlayItem) {
 			gl.viewport(0, (gl.canvas.height - gl.canvas.width)* 0.5, gl.canvas.width, gl.canvas.width);
 	else
 		gl.viewport((gl.canvas.width - gl.canvas.height)* 0.5, 0, gl.canvas.height, gl.canvas.height);
-
 	gl.clearColor(0.2, 0, 0, 1);
 	var m = mat.mat4.create();
-	var fDistance = 0.1;
+	var fDistance = -0.54;
 	//modelMatrix *= TMat4.Translate(0, 0, -fDistance);
 	mat.mat4.translate(m,m, [0, 0, fDistance]);
 	// https://glmatrix.net/docs/module-mat4.html  https://glmatrix.net/docs/mat4.js.html
@@ -366,26 +361,42 @@ function draw3D(gl, overlayItem) {
 	if (Math.abs(rayDir[1]) < tiny) rayDir[1] = tiny;
 	if (Math.abs(rayDir[2]) < tiny) rayDir[2] = tiny;
 	//console.log( ">>", renderAzimuth, " : ", renderElevation, ">>>> ", rayDir);
-	gl.disable(gl.DEPTH_TEST);
-	gl.enable(gl.CULL_FACE);
-	gl.cullFace(gl.FRONT);
-	//gl.cullFace(gl.BACK);
-	//gl.enable(gl.BLEND);
-	//gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+	//gl.disable(gl.DEPTH_TEST);
+	//gl.enable(gl.CULL_FACE);
+	//gl.cullFace(gl.FRONT);
 	gl.uniformMatrix4fv(renderShader.uniforms["mvpMtx"], false, m);
 	gl.uniform3fv(renderShader.uniforms["rayDir"], rayDir);
 	gl.uniform3fv(renderShader.uniforms["texVox"], vox);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 14);//cube is 12 triangles, triangle-strip creates n-2 triangles
-	return 'azimuth: ' + renderAzimuth.toFixed(0)+' elevation: '+renderElevation.toFixed(0);
+	let posString = 'azimuth: ' + renderAzimuth.toFixed(0)+' elevation: '+renderElevation.toFixed(0);
+	bus.$emit('crosshair-pos-change', posString);
+	return posString;
 }
 
+function frac2mm(overlayItem) {
+	//compute crosshair in mm, not fractions:
+	let pos = mat.vec4.fromValues(crosshairPos[0],crosshairPos[1],crosshairPos[2],1);
+	let d = overlayItem.volume.hdr.dims;
+	let dim = mat.vec4.fromValues(d[1], d[2], d[3], 1); 
+	let sf = overlayItem.volume.hdr.affine;
+	let sform = mat.mat4.fromValues(
+		sf[0][0], sf[1][0], sf[2][0], sf[3][0],
+		sf[0][1], sf[1][1], sf[2][1], sf[3][1],
+		sf[0][2], sf[1][2], sf[2][2], sf[3][2],
+		sf[0][3], sf[1][3], sf[2][3], sf[3][3]);
+	mat.vec4.mul(pos, pos, dim);
+	let shim = mat.vec4.fromValues(-0.5, -0.5, -0.5, 0); //bitmap with 5 voxels scaled 0..1, voxel centers are 0.1,0.3,0.5,0.7,0.9 
+	mat.vec4.add(pos, pos, shim);
+	mat.vec4.transformMat4(pos, pos, sform);
+	return pos;
+} // frac2mm()
+
 export function drawSlices(gl, overlayItem) {
-	console.log(overlayItem.volumeURL);
+	//console.log(overlayItem.volumeURL);
 	gl.clearColor(backColor[0], backColor[1], backColor[2], backColor[3]);
 	gl.clear(gl.COLOR_BUFFER_BIT);
-	if (sliceType === sliceTypeRender) { //draw rendering
+	if (sliceType === sliceTypeRender) //draw rendering
 		return draw3D(gl, overlayItem);
-	}
 	let {volScale, AR} = sliceScale(gl, overlayItem);
 	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 	var w = volScale[0] * AR[0];
@@ -415,9 +426,10 @@ export function drawSlices(gl, overlayItem) {
 		draw2D(gl, [0, 0, w, h], 2);
 	}
 	gl.finish();
-  var posString = crosshairPos[0].toFixed(2)+'×'+crosshairPos[1].toFixed(2)+'×'+crosshairPos[2].toFixed(2);
-  // temporary event bus mechanism. It uses Vue, but it would be ideal to divorce vue from this gl code.
-  bus.$emit('crosshair-pos-change', posString);
+	let pos = frac2mm(overlayItem);
+	let posString = pos[0].toFixed(2)+'×'+pos[1].toFixed(2)+'×'+pos[2].toFixed(2);
+	// temporary event bus mechanism. It uses Vue, but it would be ideal to divorce vue from this gl code.
+	bus.$emit('crosshair-pos-change', posString);
 	return posString
-}
+} // drawSlices()
 

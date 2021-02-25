@@ -65,23 +65,19 @@ export default {
       this.mouseDown = true
       var rect = canvas.getBoundingClientRect()
       nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
-      nv.setAzEl(e.clientX - rect.left,e.clientY - rect.top)
+      nv.mouseDown(e.clientX - rect.left,e.clientY - rect.top)
     })
-
     gl.canvas.addEventListener('mousemove', (e) => {
       if (this.mouseDown) {
         var rect = canvas.getBoundingClientRect()
         nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
-        nv.setAzEl(e.clientX - rect.left,e.clientY - rect.top)
+        nv.mouseMove(e.clientX - rect.left,e.clientY - rect.top)
       }
     })
 
     gl.canvas.addEventListener('mouseup', () => {
       this.mouseDown = false
     })
-
-
-
     window.addEventListener('resize', this.onWindowResize)
     this.gl = gl;
     this.gl.enable(this.gl.CULL_FACE);
