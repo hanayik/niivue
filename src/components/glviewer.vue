@@ -90,6 +90,18 @@ export default {
       this.mouseDown = false
     })
 
+    window.addEventListener('keypress', (e) => {
+      if (e.key === 'z') {
+        this.zDown = true
+      }
+    })
+
+    window.addEventListener('keyup', (e) => {
+      if (e.key === 'z') {
+        this.zDown = false
+      }
+    })
+
     window.addEventListener('resize', this.onWindowResize)
     this.gl = gl;
     this.gl.enable(this.gl.CULL_FACE);
