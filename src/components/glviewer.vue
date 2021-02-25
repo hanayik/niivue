@@ -27,6 +27,8 @@ export default {
     return {
       selectedOverlay: 0,
       mouseDown: false,
+      zDown: false,
+      scale: 1
     };
   },
   watch: {
@@ -76,11 +78,30 @@ export default {
       }
     })
 
+    gl.canvas.addEventListener('wheel', (e) => {
+      if (this.zDown) {
+        e.preventDefault()
+        this.scale += e.deltaY * -0.01
+        nv.setScale(this.scale)
+      }
+      
+    })
+
     gl.canvas.addEventListener('mouseup', () => {
       this.mouseDown = false
     })
 
+    window.addEventListener('keypress', (e) => {
+      if (e.key === 'z') {
+        this.zDown = true
+      }
+    })
 
+    window.addEventListener('keyup', (e) => {
+      if (e.key === 'z') {
+        this.zDown = false
+      }
+    })
 
     window.addEventListener('resize', this.onWindowResize)
     this.gl = gl;
