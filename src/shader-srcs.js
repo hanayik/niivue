@@ -37,7 +37,7 @@ void main() {
     vec3 dir = backPosition - start;
     float len = length(dir);
 	float lenVox = length((texVox * start) - (texVox * backPosition));
-	float sliceSize = len / lenVox; //e.g. if ray length is 1.0 and traverses 50 voxels, each voxel is 0.02 in unit cube 
+	float sliceSize = len / lenVox; //e.g. if ray length is 1.0 and traverses 50 voxels, each voxel is 0.02 in unit cube
 	float stepSize = sliceSize; //quality: larger step is faster traversal, but fewer samples
 	float opacityCorrection = stepSize/sliceSize;
     dir = normalize(dir);
@@ -49,11 +49,11 @@ void main() {
 	while (samplePos.a <= len) {
 		float val = texture(volume, samplePos.xyz).r;
 		if (val > 0.01) break;
-		samplePos += deltaDirFast; //advance ray position	
+		samplePos += deltaDirFast; //advance ray position
 	}
 	if (samplePos.a > len) return;
 	samplePos -= deltaDirFast;
-	if (samplePos.a < 0.0) 
+	if (samplePos.a < 0.0)
 		vec4 samplePos = vec4(start.xyz, 0.0); //ray position
 	//end: fast pass
 	vec4 colAcc = vec4(0.0,0.0,0.0,0.0);
@@ -62,14 +62,14 @@ void main() {
     samplePos += deltaDir * ran; //jitter ray
 	while (samplePos.a <= len) {
 		float val = texture(volume, samplePos.xyz).r;
-		samplePos += deltaDir; //advance ray position	
+		samplePos += deltaDir; //advance ray position
 		if (val < 0.01) continue;
 		vec4 colorSample = texture(colormap, vec2(val, 0.5)).rgba;
 		colorSample.a = 1.0-pow((1.0 - colorSample.a), opacityCorrection);
 		colorSample.rgb *= colorSample.a;
 		colAcc= (1.0 - colAcc.a) * colorSample + colAcc;
 		if ( colAcc.a > earlyTermination )
-			break;			
+			break;
 	}
 	colAcc.a = colAcc.a / earlyTermination;
 	fColor = colAcc;
@@ -87,10 +87,10 @@ void main(void) {
 	gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
 	gl_Position.x = leftBottomWidthHeight.x + (pos.x * leftBottomWidthHeight.b);
 	gl_Position.y = leftBottomWidthHeight.y + (pos.y * leftBottomWidthHeight.a);
-	if (axCorSag == 1) 
-		texPos = vec3(pos.x, slice, pos.y);	
-	else if (axCorSag == 2) 
-		texPos = vec3(slice, pos.x, pos.y);	
+	if (axCorSag == 1)
+		texPos = vec3(pos.x, slice, pos.y);
+	else if (axCorSag == 2)
+		texPos = vec3(slice, pos.x, pos.y);
 	else
 		texPos = vec3(pos.xy, slice);
 }`;
@@ -102,10 +102,11 @@ precision highp int;
 precision highp float;
 uniform highp sampler3D volume;
 uniform highp sampler2D colormap;
+uniform float opacity;
 in vec3 texPos;
 out vec4 color;
 void main() {
-	color = vec4(texture(colormap, vec2(texture(volume, texPos).r, 0.5)).rgb, 1.0);
+	color = vec4(texture(colormap, vec2(texture(volume, texPos).r, 0.5)).rgb, opacity);
 }`;
 
 export var vertLineShader =

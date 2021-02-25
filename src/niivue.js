@@ -9,8 +9,6 @@ import {bus} from "@/bus.js"
 
 export var colorbarHeight = 0.05; //0 for no colorbars
 export var crosshairWidth = 0.005; //0 for no crosshairs
-export var crosshairColor =  [1, 0, 0, 1];
-export var crosshairPos = [0.5, 0.5, 0.5];
 export var backColor =  [0, 0, 0, 1];
 export const sliceTypeAxial = 0;
 export const sliceTypeCoronal = 1;
@@ -20,8 +18,12 @@ export const sliceTypeRender = 4;
 export var sliceType = sliceTypeMultiplanar; //view: axial, coronal, sagittal, multiplanar or render
 export var renderAzimuth = 120;
 export var renderElevation = 15;
+
+var crosshairColor =  [1, 0, 0, 1];
+var crosshairPos = [0.5, 0.5, 0.5];
 var volScaleMultiplier = 1;
 var _overlayItem = null
+var colorBarMargin = 0.1
 
 var colormapTexture = null
 var volumeTexture = null
@@ -37,6 +39,13 @@ var screenSlices = [ //location and type of each 2D slice on screen, allows clic
   {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial},
   {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial}
 ];
+var sliceOpacity = 1.0
+
+bus.$on('colormap-change', function (selectedColorMap) {
+    selectColormap(getGL(), selectedColorMap)
+    drawSlices(getGL(), _overlayItem)
+});
+
 
 export function mouseDown(x, y) {
 	if (sliceType != sliceTypeRender) return;
@@ -51,10 +60,22 @@ export function mouseMove(x, y) {
 	drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
 } // mouseMove()
 
+export function setCrosshairColor(color) {
+  crosshairColor = color
+  drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
+}
+
+
 export function setSliceType(st) {
   sliceType = st
   drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
 } // setSliceType()
+
+export function setSliceOpacity(op) {
+  sliceOpacity = op
+  drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
+}
+
 
 export function setScale(scale) {
   volScaleMultiplier = scale
@@ -173,10 +194,8 @@ export function updateGLVolume(gl, overlayItem) { //load volume or change contra
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cubeStrip), gl.STATIC_DRAW);
 	gl.enableVertexAttribArray(0);
 	gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-	// selectColormap(gl, "gray")
 	var hdr = overlayItem.volume.hdr
 	var img = overlayItem.volume.img
-	// console.log(hdr)
 	// var vox = hdr.dims[1] * hdr.dims[2] * hdr.dims[3];
 	var imgRaw = null
 	if (hdr.datatypeCode === 2) //data already uint8
@@ -189,7 +208,6 @@ export function updateGLVolume(gl, overlayItem) { //load volume or change contra
 		imgRaw = new Uint16Array(img);
 	calibrateIntensity(imgRaw, overlayItem)
 	var img8 = scaleTo8Bit(imgRaw, overlayItem)
-	// console.log(img8)
 	if (volumeTexture)
 		gl.deleteTexture(volumeTexture);
 	volumeTexture = gl.createTexture();
@@ -311,7 +329,8 @@ function drawColorbar(gl, leftBottomWidthHeight) {
 	if ((leftBottomWidthHeight[2] <= 0) || (leftBottomWidthHeight[3] <= 0))
 		return;
 	colorbarShader.use(gl);
-	gl.uniform4f(colorbarShader.uniforms["leftBottomWidthHeight"], leftBottomWidthHeight[0], leftBottomWidthHeight[1], leftBottomWidthHeight[2], leftBottomWidthHeight[3]);
+  console.log(leftBottomWidthHeight[0], leftBottomWidthHeight[1], leftBottomWidthHeight[2], leftBottomWidthHeight[3]);
+	gl.uniform4f(colorbarShader.uniforms["leftBottomWidthHeight"], leftBottomWidthHeight[0]+colorBarMargin, leftBottomWidthHeight[1], leftBottomWidthHeight[2]-colorBarMargin, leftBottomWidthHeight[3]);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 } // drawColorbar()
 
@@ -322,6 +341,8 @@ function draw2D(gl, leftBottomWidthHeight, axCorSag) {
 	if (axCorSag === 2)
 		crossXYZ = [crosshairPos[1], crosshairPos[2],crosshairPos[0]]; //sagittal: width=j, height=k, slice=i
 	sliceShader.use(gl);
+  //gl.disable(gl.DEPTH_TEST);
+  gl.uniform1f(sliceShader.uniforms["opacity"], sliceOpacity);
 	gl.uniform1i(sliceShader.uniforms["axCorSag"], axCorSag);
 	gl.uniform1f(sliceShader.uniforms["slice"], crossXYZ[2]);
 	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], leftBottomWidthHeight[0], leftBottomWidthHeight[1], leftBottomWidthHeight[2], leftBottomWidthHeight[3]);
@@ -390,7 +411,7 @@ function frac2mm(overlayItem) {
 	//compute crosshair in mm, not fractions:
 	let pos = mat.vec4.fromValues(crosshairPos[0],crosshairPos[1],crosshairPos[2],1);
 	let d = overlayItem.volume.hdr.dims;
-	let dim = mat.vec4.fromValues(d[1], d[2], d[3], 1); 
+	let dim = mat.vec4.fromValues(d[1], d[2], d[3], 1);
 	let sf = overlayItem.volume.hdr.affine;
 	let sform = mat.mat4.fromValues(
 		sf[0][0], sf[1][0], sf[2][0], sf[3][0],
@@ -398,7 +419,7 @@ function frac2mm(overlayItem) {
 		sf[0][2], sf[1][2], sf[2][2], sf[3][2],
 		sf[0][3], sf[1][3], sf[2][3], sf[3][3]);
 	mat.vec4.mul(pos, pos, dim);
-	let shim = mat.vec4.fromValues(-0.5, -0.5, -0.5, 0); //bitmap with 5 voxels scaled 0..1, voxel centers are 0.1,0.3,0.5,0.7,0.9 
+	let shim = mat.vec4.fromValues(-0.5, -0.5, -0.5, 0); //bitmap with 5 voxels scaled 0..1, voxel centers are 0.1,0.3,0.5,0.7,0.9
 	mat.vec4.add(pos, pos, shim);
 	mat.vec4.transformMat4(pos, pos, sform);
 	return pos;

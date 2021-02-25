@@ -2,7 +2,7 @@
 
   <div class='mt-5' id="controls" >
     <v-row class="my-2 mx-2 align-center">
-      <h3>Overlay list</h3>
+      <h3>Layers</h3>
       <v-spacer></v-spacer>
       <v-btn @click='onAddOverlay' class="mx-2" small>Add overlay</v-btn>
     </v-row>
@@ -23,7 +23,8 @@
             <v-row>
               <v-select
                 :items="colorMaps"
-                v-model="overlay.colorMap"
+                v-model="selectedColorMap"
+                @change="onColorChange"
                 label="Color map">
               </v-select>
             </v-row>
@@ -68,10 +69,13 @@
               <v-col>
               <p>Opacity</p>
                 <v-slider
-                  v-model="overlay.opacity"
-                  step="1"
+                  v-model="opacity"
+                  step="0.01"
+                  max="1"
+                  min="0"
                   thumb-label
                   ticks
+                  @input="onOpacityChange"
                 >
                 </v-slider>
               </v-col>
@@ -84,13 +88,14 @@
       </v-expansion-panels>
     </v-row>
 
+    
   </div>
 
 </template>
 
 <script>
 import draggable from "vuedraggable";
-//import {bus} from "@/bus.js"
+import {bus} from "@/bus.js"
 
 export default {
   props: {
@@ -106,22 +111,29 @@ export default {
   data (){
     return {
       colorSelected: 'gray',
-      colorMaps:['gray', 'Plasma', 'Viridis', 'Inferno'],
+      colorMaps:['gray', 'Winter', 'Warm', 'Plasma', 'Viridis', 'Inferno'],
+      selectedColorMap: 'gray',
       eyeIcon: "mdi-eye",
       overlays_: this.overlays,
-      draggable: true
+      draggable: true,
+      opacity: 1.0,
       
     }
   },
 
   methods: {
     toggleEye: function() {
-      this.eyeIcon = "mdi-eye" //this.eyeIcon == "mdi-eye" ? "mdi-eye-off" : "mdi-eye"
+      this.eyeIcon = this.eyeIcon == "mdi-eye" ? "mdi-eye-off" : "mdi-eye"
     },
 
-    onColorChange: function(event, idx) {
-      console.log(event)
-      console.log(idx)
+    onColorChange: function() {
+      bus.$emit('colormap-change', this.selectedColorMap);
+
+    },
+
+    onOpacityChange: function() {
+      bus.$emit('opacity-change', this.opacity);
+
     },
 
     onAddOverlay: function () {
