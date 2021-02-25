@@ -63,7 +63,7 @@ export default {
   created () {
     bus.$on('crosshair-pos-change', (posString) => {
     this.coordinateString = posString 
-      console.log(posString)
+      //console.log(posString)
     });
 
   },
