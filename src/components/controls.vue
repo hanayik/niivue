@@ -1,20 +1,20 @@
 <template>
 
-  <div id="controls" >
+  <div class='mt-5' id="controls" >
     <v-row class="my-2 mx-2 align-center">
       <h3>Overlay list</h3>
       <v-spacer></v-spacer>
-      <v-btn class="mx-2" small>Add overlay</v-btn>
+      <v-btn @click='onAddOverlay' class="mx-2" small>Add overlay</v-btn>
     </v-row>
     <v-row no-gutters>
       <v-expansion-panels>
-        <draggable class="row mx-2 my-2" v-model="overlays">
+        <draggable handle='.drag-handle' class="row mx-2 my-2" v-model="overlays">
           <v-expansion-panel
           v-for="(overlay, i) in overlays"
           :key="i">
           <v-expansion-panel-header>
             <v-row no-gutters class="align-center">
-              <v-icon class="mx-2"> mdi-drag-horizontal-variant </v-icon>
+              <v-icon class="mx-2 drag-handle"> mdi-drag-horizontal-variant </v-icon>
               <v-icon class="mx-2" @click.stop="toggleEye"> {{ eyeIcon }} </v-icon>{{ overlay.name }}
             </v-row>
             
@@ -36,6 +36,7 @@
                 :min="overlay.intensityMin"
                 hide-details
                 class="align-center"
+
               >
                 <template v-slot:prepend>
                   <v-text-field
@@ -45,7 +46,7 @@
                     single-line
                     type="number"
                     style="width: 60px"
-                    @change="$set(overlay.intensityRange, 0, $event)"
+                    @input="$set(overlay.intensityRange, 0, $event)"
                   ></v-text-field>
                 </template>
                 <template v-slot:append>
@@ -56,7 +57,7 @@
                     single-line
                     type="number"
                     style="width: 60px"
-                    @change="$set(overlay.intensityRange, 1, $event)"
+                    @input="$set(overlay.intensityRange, 1, $event)"
                   ></v-text-field>
                 </template>
               </v-range-slider>
@@ -89,6 +90,7 @@
 
 <script>
 import draggable from "vuedraggable";
+//import {bus} from "@/bus.js"
 
 export default {
   props: {
@@ -106,19 +108,24 @@ export default {
       colorSelected: 'gray',
       colorMaps:['gray', 'Plasma', 'Viridis', 'Inferno'],
       eyeIcon: "mdi-eye",
-      overlays_: this.overlays
+      overlays_: this.overlays,
+      draggable: true
       
     }
   },
 
   methods: {
     toggleEye: function() {
-      this.eyeIcon = this.eyeIcon == "mdi-eye" ? "mdi-eye-off" : "mdi-eye"
+      this.eyeIcon = "mdi-eye" //this.eyeIcon == "mdi-eye" ? "mdi-eye-off" : "mdi-eye"
     },
 
     onColorChange: function(event, idx) {
       console.log(event)
       console.log(idx)
+    },
+
+    onAddOverlay: function () {
+      alert('adding overlays in this demo is not implemented yet! :)')
     }
   }
 
@@ -128,7 +135,8 @@ export default {
 
 <style scoped>
 
-#controls {
+drag-handle {
+  color: black;
 }
 
 </style>

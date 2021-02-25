@@ -3,6 +3,9 @@
 </template>
 <script>
 import * as nv from "../niivue.js";
+import {bus} from "@/bus.js"
+
+
 
 export default {
   name: "glviewer",
@@ -14,9 +17,16 @@ export default {
     overlays: Array,
     shader: String,
   },
+  created () {
+    bus.$on('slice-type-change', function (sliceType) {
+    nv.setSliceType(sliceType)
+});
+
+  },
   data() {
     return {
-      selectedOverlay: 0
+      selectedOverlay: 0,
+      mouseDown: false,
     };
   },
   watch: {
@@ -25,8 +35,8 @@ export default {
     overlays: {
       deep: true,
       handler () {
-        nv.selectColormap(this.gl, this.overlays[this.selectedOverlay].colorMap)
-        nv.updateGLVolume(this.gl, this.overlays[this.selectedOverlay])
+        //nv.selectColormap(this.gl, this.overlays[this.selectedOverlay].colorMap)
+        //nv.updateGLVolume(this.gl, this.overlays[this.selectedOverlay])
     },
 
     }
@@ -52,12 +62,25 @@ export default {
     const canvas = document.querySelector("#gl");
     const gl = canvas.getContext("webgl2");
     gl.canvas.addEventListener('mousedown', (e) => {
-      const rect = canvas.getBoundingClientRect()
-      //nv.mouse.x = e.clientX - rect.left
-      //nv.mouse.y = e.clientY - rect.top
+      this.mouseDown = true
+      var rect = canvas.getBoundingClientRect()
       nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
-      //console.log(nv.mouse)
+      nv.setAzEl(e.clientX - rect.left,e.clientY - rect.top)
     })
+
+    gl.canvas.addEventListener('mousemove', (e) => {
+      if (this.mouseDown) {
+        var rect = canvas.getBoundingClientRect()
+        nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
+        nv.setAzEl(e.clientX - rect.left,e.clientY - rect.top)
+      }
+    })
+
+    gl.canvas.addEventListener('mouseup', () => {
+      this.mouseDown = false
+    })
+
+
 
     window.addEventListener('resize', this.onWindowResize)
     this.gl = gl;
@@ -67,6 +90,7 @@ export default {
     this.gl.blendFunc(this.gl.ONE, this.gl.ONE_MINUS_SRC_ALPHA);
     nv.init(this.gl);
     nv.loadVolume(this.overlays[this.selectedOverlay]); // just load first overlay. addtional overlays are not handled yet
+
 
   },
 };
