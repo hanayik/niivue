@@ -1,9 +1,9 @@
 <template>
-  <div id="viewer" >
+  <div class="viewer" id="viewer" >
     <v-dialog
       v-model="dialog"
-      max-width="200">
-      <v-color-picker mode='rgba' v-model="crosshairColor" @input="onCrosshairColorChange">
+      max-width="400">
+      <v-color-picker width=400 mode='rgba' v-model="crosshairColor" @input="onCrosshairColorChange">
       </v-color-picker>
     </v-dialog>
    
@@ -57,10 +57,17 @@ export default {
       },
   methods: {
     onWindowResize: function() {
+      var bottomStatusBarHeight = 100 // this is an estimate
       var canvas = document.querySelector("#gl") 
       var viewer = document.querySelector("#viewer")
-      canvas.width = viewer.offsetWidth-1
-      canvas.height = viewer.offsetHeight-1
+      canvas.width =  viewer.clientWidth
+      canvas.height = viewer.clientHeight
+      // there has to be a better way to handle this resizing. It seems odd to need the document (window) client
+      // height for this to work. 
+      if (viewer.getBoundingClientRect().bottom > document.documentElement.clientHeight){
+        viewer.style.height = document.documentElement.clientHeight - bottomStatusBarHeight
+        canvas.height = document.documentElement.clientHeight - bottomStatusBarHeight
+      }
       nv.drawSlices(this.gl, this.overlays[this.selectedOverlay])
     },
 
@@ -73,10 +80,11 @@ export default {
   mounted() {
     // get the gl context after the component has been mounted and initialized
     const glEl = document.createElement('canvas')
+    glEl.classList.add('fillParent')
     const viewer = document.querySelector("#viewer")
     glEl.id = "gl"
-    glEl.width = viewer.offsetWidth-1
-    glEl.height = viewer.offsetHeight-1
+    glEl.width = viewer.clientWidth//viewer.offsetWidth-1
+    glEl.height = viewer.clientHeight//viewer.offsetHeight-1
     viewer.appendChild(glEl)
     const canvas = document.querySelector("#gl");
     const gl = canvas.getContext("webgl2");
@@ -144,22 +152,27 @@ export default {
 
   },
 };
-</script>
-
-<style scoped>
-#viewer {
-  background-color: black;
-  width: 100%;
-  height:100%;
-  min-height: 600px;
+/*
+min-height: 600px;
   max-height: 600px;
   min-width: 600px;
   max-width: 1200px;
   overflow-x: hidden;
   overflow-y: hidden;
+  */
+</script>
+
+<style scoped>
+.viewer {
+  background-color: black;
+  width: 100%;
+  height:100%;
+  line-height:0;
 }
 
-body {
-  background-color: black;
+.fillParent {
+  height: 100%;
+  width: 100%;
 }
+
 </style>
