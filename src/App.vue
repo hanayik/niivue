@@ -19,7 +19,7 @@
     </v-app-bar>
 
     <v-main>
-      <v-row>
+      <v-row style="height:100%">
       <!-- app uses a 12 column layout, so the controls take up 4 columns on the left of the screen -->
       <v-col cols="4">
         <controls :overlays="overlayList">
@@ -106,11 +106,7 @@ export default {
 };
 </script>
 
-<style scoped>
+<style>
 
-  .scene-controls {
-    height: 140px;
-    width: auto;
-  }
 
 </style>
