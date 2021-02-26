@@ -1,6 +1,7 @@
 <template>
   <v-app>
     <v-app-bar app>
+      <!-- make app bar scroll in horizontal direction -->
       <v-tabs v-model='tab'>
         <v-tabs-slider color='black'></v-tabs-slider>
         <v-tab
