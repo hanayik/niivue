@@ -6,6 +6,19 @@
       <v-color-picker width=400 mode='rgba' v-model="crosshairColor" @input="onCrosshairColorChange">
       </v-color-picker>
     </v-dialog>
+
+    <v-dialog
+      v-model="discoMode"
+      max-width="400">
+      <v-card color="rgba(0, 0, 0, 0.4)">
+        <v-row no-gutters>  
+          <v-spacer></v-spacer>
+          <h2 style="color: white;">Disco mode</h2>
+          <v-spacer></v-spacer>
+        </v-row>
+      </v-card>
+    </v-dialog>
+
    
   </div>
 </template>
@@ -37,9 +50,15 @@ export default {
       selectedOverlay: 0,
       mouseDown: false,
       zDown: false,
+      discoMode: false,
+      discoModeColorMapTimer: null,
+      discoModeCrosshairTimer: null,
       scale: 1,
       dialog: false,
-      crosshairColor: { r: 255, g: 0, b: 0, a: 1 }
+      crosshairColor: { r: 255, g: 0, b: 0, a: 1 },
+      colorMaps:['Winter', 'Warm', 'Plasma', 'Viridis', 'Inferno'],
+      selectedColorMap: 'Winter',
+
     };
   },
   watch: {
@@ -129,6 +148,27 @@ export default {
       if (e.key === 'z') {
         this.zDown = true
       }
+      if (e.key === 'd') {
+        this.discoMode = this.discoMode == false ? true: false
+        clearInterval(this.discoModeColorMapTimer)
+        clearInterval(this.discoModeCrosshairTimer)
+        if (this.discoMode) {
+          this.discoModeColorMapTimer = setInterval(
+            () => {
+              bus.$emit('colormap-change', this.colorMaps[Math.floor(Math.random() * this.colorMaps.length)]);
+
+            }, 200)
+          this.discoModeCrosshairTimer = setInterval(
+            function () {
+              nv.setCrosshairColor([Math.random(), Math.random(), Math.random(), 1])
+            }, 200)
+        } else {
+          bus.$emit('colormap-change', "gray");
+          nv.setCrosshairColor([1, 0, 0, 1])
+
+        }
+      }
+
     })
 
     window.addEventListener('keyup', (e) => {
@@ -152,14 +192,7 @@ export default {
 
   },
 };
-/*
-min-height: 600px;
-  max-height: 600px;
-  min-width: 600px;
-  max-width: 1200px;
-  overflow-x: hidden;
-  overflow-y: hidden;
-  */
+
 </script>
 
 <style scoped>
