@@ -5,10 +5,11 @@ import { vertSliceShader, fragSliceShader } from "./shader-srcs.js";
 import { vertLineShader, fragLineShader } from "./shader-srcs.js";
 import { vertRenderShader, fragRenderShader } from "./shader-srcs.js";
 import { vertColorbarShader, fragColorbarShader } from "./shader-srcs.js";
+
 import {bus} from "@/bus.js"
 
 export var colorbarHeight = 0.05; //0 for no colorbars
-export var crosshairWidth = 0.005; //0 for no crosshairs
+export var crosshairWidth = 1; //0 for no crosshairs
 export var backColor =  [0, 0, 0, 1];
 export const sliceTypeAxial = 0;
 export const sliceTypeCoronal = 1;
@@ -23,7 +24,7 @@ var crosshairColor =  [1, 0, 0, 1];
 var crosshairPos = [0.5, 0.5, 0.5];
 var volScaleMultiplier = 1;
 var _overlayItem = null
-var colorBarMargin = 0.1
+var colorBarMargin = 0.05
 
 var colormapTexture = null
 var volumeTexture = null
@@ -297,15 +298,12 @@ export function mouseClick(gl, overlayItem, x, y) {
 	// webGL clip space L,R,T,B = [-1, 1, 1, 1]
 	// n.b. webGL Y polarity reversed
 	// https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
-	var glx = ((x / gl.canvas.width) - 0.5) * 2.0;
-	var gly = (((gl.canvas.height - y) / (gl.canvas.height)) - 0.5) * 2.0;
-	//console.log("Click clip space (x,y):", glx, gly);
 	for (let i = 0; i < numScreenSlices; i++) {
 		var axCorSag = screenSlices[i].axCorSag;
 		if (axCorSag > sliceTypeSagittal) continue;
 		var lbwh = screenSlices[i].leftBottomWidthHeight;
-		var fracX = (glx - lbwh[0]) / lbwh[2];
-		var fracY = (gly - lbwh[1]) / lbwh[3];
+		var fracX = (x - lbwh[0]) / lbwh[2];
+		var fracY = (lbwh[1] - y) / lbwh[3];
 		if ((fracX >= 0.0) && (fracX < 1.0) && (fracY >= 0.0) && (fracY < 1.0)) { //user clicked on slice i
 			if (axCorSag === sliceTypeAxial) {
 				crosshairPos[0] = fracX;
@@ -328,10 +326,21 @@ export function mouseClick(gl, overlayItem, x, y) {
 function drawColorbar(gl, leftBottomWidthHeight) {
 	if ((leftBottomWidthHeight[2] <= 0) || (leftBottomWidthHeight[3] <= 0))
 		return;
+	//console.log("bar:", leftBottomWidthHeight[0], leftBottomWidthHeight[1], leftBottomWidthHeight[2], leftBottomWidthHeight[3]);
+	if (crosshairWidth > 0) {
+		//gl.disable(gl.DEPTH_TEST);
+		lineShader.use(gl)
+		gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
+		gl.uniform2fv(lineShader.uniforms["canvasWidthHeight"], [gl.canvas.width, gl.canvas.height]);
+		let lbwh = [leftBottomWidthHeight[0]-1, leftBottomWidthHeight[1]+1, leftBottomWidthHeight[2]+2, leftBottomWidthHeight[3]+2];
+		gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], lbwh[0], lbwh[1], lbwh[2], lbwh[3]);
+		gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+	}
 	colorbarShader.use(gl);
-  console.log(leftBottomWidthHeight[0], leftBottomWidthHeight[1], leftBottomWidthHeight[2], leftBottomWidthHeight[3]);
-	gl.uniform4f(colorbarShader.uniforms["leftBottomWidthHeight"], leftBottomWidthHeight[0]+colorBarMargin, leftBottomWidthHeight[1], leftBottomWidthHeight[2]-colorBarMargin, leftBottomWidthHeight[3]);
+	gl.uniform2fv(colorbarShader.uniforms["canvasWidthHeight"], [gl.canvas.width, gl.canvas.height]);
+	gl.uniform4f(colorbarShader.uniforms["leftBottomWidthHeight"], leftBottomWidthHeight[0], leftBottomWidthHeight[1], leftBottomWidthHeight[2], leftBottomWidthHeight[3]);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+	//gl.enable(gl.DEPTH_TEST);
 } // drawColorbar()
 
 function draw2D(gl, leftBottomWidthHeight, axCorSag) {
@@ -341,10 +350,11 @@ function draw2D(gl, leftBottomWidthHeight, axCorSag) {
 	if (axCorSag === 2)
 		crossXYZ = [crosshairPos[1], crosshairPos[2],crosshairPos[0]]; //sagittal: width=j, height=k, slice=i
 	sliceShader.use(gl);
-  //gl.disable(gl.DEPTH_TEST);
-  gl.uniform1f(sliceShader.uniforms["opacity"], sliceOpacity);
+	//gl.disable(gl.DEPTH_TEST);
+	gl.uniform1f(sliceShader.uniforms["opacity"], sliceOpacity);
 	gl.uniform1i(sliceShader.uniforms["axCorSag"], axCorSag);
 	gl.uniform1f(sliceShader.uniforms["slice"], crossXYZ[2]);
+	gl.uniform2fv(sliceShader.uniforms["canvasWidthHeight"], [gl.canvas.width, gl.canvas.height]);
 	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], leftBottomWidthHeight[0], leftBottomWidthHeight[1], leftBottomWidthHeight[2], leftBottomWidthHeight[3]);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 	//record screenSlices to detect mouse click positions
@@ -354,12 +364,13 @@ function draw2D(gl, leftBottomWidthHeight, axCorSag) {
 	if (crosshairWidth <= 0.0) return;
 	lineShader.use(gl)
 	gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
+	gl.uniform2fv(lineShader.uniforms["canvasWidthHeight"], [gl.canvas.width, gl.canvas.height]);
 	//vertical line of crosshair:
 	var left = leftBottomWidthHeight[0] + (leftBottomWidthHeight[2] * crossXYZ[0]);
 	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], left - crosshairWidth, leftBottomWidthHeight[1],  crosshairWidth, leftBottomWidthHeight[3]);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 	//horizontal line of crosshair:
-	var bottom = leftBottomWidthHeight[1] + (leftBottomWidthHeight[3] * crossXYZ[1]);
+	var bottom = leftBottomWidthHeight[1] - (leftBottomWidthHeight[3] * crossXYZ[1]);
 	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], leftBottomWidthHeight[0], bottom - crosshairWidth, leftBottomWidthHeight[2], crosshairWidth);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 } // draw2D()
@@ -429,10 +440,10 @@ function scaleSlice(gl, w, h) {
 	let scalePix = gl.canvas.clientWidth / w;
 	if ((h * scalePix) > gl.canvas.clientHeight)
 		scalePix = gl.canvas.clientHeight / h;
-	//webGL clip space is -1,-1..1,1 so full width and height is 2
-	let wScale = (2 * w * scalePix) / gl.canvas.clientWidth;
-	let hScale = (2 * h * scalePix) / gl.canvas.clientHeight;
-	let leftBottomWidthHeight = [-1 + (0.5 * (2 - wScale)), -1 + (0.5 * (2 - hScale)), wScale, hScale];
+	//canvas space is 0,0...w,h with origin at upper left
+	let wPix = w * scalePix;
+	let hPix = h * scalePix;
+	let leftBottomWidthHeight = [(gl.canvas.clientWidth-wPix) * 0.5, gl.canvas.clientHeight -((gl.canvas.clientHeight-hPix) * 0.5), wPix, hPix];
 	return leftBottomWidthHeight;
 } // scaleSlice()
 
@@ -462,11 +473,12 @@ export function drawSlices(gl, overlayItem) {
 		//draw axial
 		draw2D(gl, [lbwh[0],lbwh[1], wX, hY], 0);
 		//draw coronal
-		draw2D(gl, [lbwh[0],lbwh[1]+hY, wX, hZ], 1);
+		draw2D(gl, [lbwh[0],lbwh[1]-hY, wX, hZ], 1);
 		//draw sagittal
-		draw2D(gl, [lbwh[0]+wX,lbwh[1]+hY, wY, hZ], 2);
+		draw2D(gl, [lbwh[0]+wX,lbwh[1]-hY, wY, hZ], 2);
 		//draw colorbar (optional)
-		drawColorbar(gl, [lbwh[0]+wX, lbwh[1] + hY * colorbarHeight, wY, hY * colorbarHeight]);
+		var margin = colorBarMargin * hY;
+		drawColorbar(gl, [lbwh[0]+wX+margin, lbwh[1] - margin, wY - margin - margin, hY * colorbarHeight]);
 	}
 	gl.finish();
 	let pos = frac2mm(overlayItem);

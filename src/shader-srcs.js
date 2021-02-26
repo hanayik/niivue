@@ -81,12 +81,16 @@ export var vertSliceShader =
 layout(location=0) in vec3 pos;
 uniform int axCorSag;
 uniform float slice;
+uniform vec2 canvasWidthHeight;
 uniform vec4 leftBottomWidthHeight;
 out vec3 texPos;
 void main(void) {
-	gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
-	gl_Position.x = leftBottomWidthHeight.x + (pos.x * leftBottomWidthHeight.b);
-	gl_Position.y = leftBottomWidthHeight.y + (pos.y * leftBottomWidthHeight.a);
+	//convert pixel x,y space 1..canvasWidth,1..canvasHeight to WebGL 1..-1,-1..1
+	vec2 frac;
+	frac.x = (leftBottomWidthHeight.x + (pos.x * leftBottomWidthHeight.z)) / canvasWidthHeight.x; //0..1
+	frac.y = 1.0 - ((leftBottomWidthHeight.y - leftBottomWidthHeight.w +((1.0 - pos.y) * leftBottomWidthHeight.w)) / canvasWidthHeight.y); //1..0
+	frac = (frac * 2.0) - 1.0;
+	gl_Position = vec4(frac, 0.0, 1.0);
 	if (axCorSag == 1)
 		texPos = vec3(pos.x, slice, pos.y);
 	else if (axCorSag == 2)
@@ -97,7 +101,7 @@ void main(void) {
 
 export var fragSliceShader =
 `#version 300 es
-#line 100
+#line 105
 precision highp int;
 precision highp float;
 uniform highp sampler3D volume;
@@ -109,20 +113,9 @@ void main() {
 	color = vec4(texture(colormap, vec2(texture(volume, texPos).r, 0.5)).rgb, opacity);
 }`;
 
-export var vertLineShader =
-`#version 300 es
-#line 114
-layout(location=0) in vec3 pos;
-uniform vec4 leftBottomWidthHeight;
-void main(void) {
-	gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
-	gl_Position.x = leftBottomWidthHeight.x + (pos.x * leftBottomWidthHeight.b);
-	gl_Position.y = leftBottomWidthHeight.y + (pos.y * leftBottomWidthHeight.a);
-}`;
-
 export var fragLineShader =
 `#version 300 es
-#line 125
+#line 119
 precision highp int;
 precision highp float;
 uniform vec4 lineColor;
@@ -133,20 +126,24 @@ void main() {
 
 export var vertColorbarShader =
 `#version 300 es
-#line 136
+#line 130
 layout(location=0) in vec3 pos;
+uniform vec2 canvasWidthHeight;
 uniform vec4 leftBottomWidthHeight;
 out float vColor;
 void main(void) {
-	gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
-	gl_Position.x = leftBottomWidthHeight.x + (pos.x * leftBottomWidthHeight.b);
-	gl_Position.y = leftBottomWidthHeight.y + (pos.y * leftBottomWidthHeight.a);
+	//convert pixel x,y space 1..canvasWidth,1..canvasHeight to WebGL 1..-1,-1..1
+	vec2 frac;
+	frac.x = (leftBottomWidthHeight.x + (pos.x * leftBottomWidthHeight.z)) / canvasWidthHeight.x; //0..1
+	frac.y = 1.0 - ((leftBottomWidthHeight.y - leftBottomWidthHeight.w +((1.0 - pos.y) * leftBottomWidthHeight.w)) / canvasWidthHeight.y); //1..0
+	frac = (frac * 2.0) - 1.0;
+	gl_Position = vec4(frac, 0.0, 1.0);
 	vColor = pos.x;
 }`;
 
 export var fragColorbarShader =
 `#version 300 es
-#line 149
+#line 147
 precision highp int;
 precision highp float;
 uniform highp sampler2D colormap;
@@ -154,4 +151,19 @@ in float vColor;
 out vec4 color;
 void main() {
 	color = vec4(texture(colormap, vec2(vColor, 0.5)).rgb, 1.0);
+}`;
+
+export var vertLineShader =
+`#version 300 es
+#line 159
+layout(location=0) in vec3 pos;
+uniform vec2 canvasWidthHeight;
+uniform vec4 leftBottomWidthHeight;
+void main(void) {
+	//convert pixel x,y space 1..canvasWidth,1..canvasHeight to WebGL 1..-1,-1..1
+	vec2 frac;
+	frac.x = (leftBottomWidthHeight.x + (pos.x * leftBottomWidthHeight.z)) / canvasWidthHeight.x; //0..1
+	frac.y = 1.0 - ((leftBottomWidthHeight.y - leftBottomWidthHeight.w +((1.0 - pos.y) * leftBottomWidthHeight.w)) / canvasWidthHeight.y); //1..0
+	frac = (frac * 2.0) - 1.0;
+	gl_Position = vec4(frac, 0.0, 1.0);
 }`;
