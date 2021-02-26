@@ -21,12 +21,12 @@
     <v-main>
       <v-row style="height:100%">
       <!-- app uses a 12 column layout, so the controls take up 4 columns on the left of the screen -->
-      <v-col cols="4">
+      <v-col sm=12 md=12 lg=4>
         <controls :overlays="overlayList">
         </controls>
       </v-col>
 
-      <v-col cols="8">
+      <v-col sm=12 md=12 lg=8>
         <glviewer :overlays="overlayList"></glviewer>
       </v-col>
       
