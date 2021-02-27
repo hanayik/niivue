@@ -533,7 +533,7 @@ export function drawSlices(gl, overlayItem) {
 		let hY = ltwh[3] * volScale[1]/(volScale[1]+volScale[2]);
 		let hZ = ltwh[3] - hY;
 		//draw axial
-		draw2D(gl, [ltwh[0],ltwh[1]+hY, wX, hY], 0);
+		draw2D(gl, [ltwh[0],ltwh[1]+hZ, wX, hY], 0);
 		//draw coronal
 		draw2D(gl, [ltwh[0],ltwh[1], wX, hZ], 1);
 		//draw sagittal
