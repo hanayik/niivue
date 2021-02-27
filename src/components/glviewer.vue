@@ -117,6 +117,16 @@ export default {
       nv.mouseDown(e.clientX - rect.left,e.clientY - rect.top)
     })
 
+    gl.canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault()
+      this.dialog = false
+      this.mouseDown = true
+      var rect = canvas.getBoundingClientRect()
+      nv.mouseClick(this.gl, this.overlays[0], e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+      nv.mouseDown(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+    })
+
+
     gl.canvas.addEventListener('mousemove', (e) => {
       if (this.mouseDown) {
         var rect = canvas.getBoundingClientRect()
@@ -124,6 +134,15 @@ export default {
         nv.mouseMove(e.clientX - rect.left,e.clientY - rect.top)
       }
     })
+
+    gl.canvas.addEventListener('touchmove', (e) => {
+      if (this.mouseDown) {
+        var rect = canvas.getBoundingClientRect()
+        nv.mouseClick(this.gl, this.overlays[0], e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+        nv.mouseMove(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+      }
+    })
+
 
     gl.canvas.addEventListener('wheel', (e) => {
       if (this.zDown) {
@@ -137,6 +156,11 @@ export default {
     gl.canvas.addEventListener('mouseup', () => {
       this.mouseDown = false
     })
+
+    gl.canvas.addEventListener('touchend', () => {
+      this.mouseDown = false
+    })
+
 
     gl.canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault()
