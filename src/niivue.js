@@ -5,11 +5,13 @@ import { vertSliceShader, fragSliceShader } from "./shader-srcs.js";
 import { vertLineShader, fragLineShader } from "./shader-srcs.js";
 import { vertRenderShader, fragRenderShader } from "./shader-srcs.js";
 import { vertColorbarShader, fragColorbarShader } from "./shader-srcs.js";
+import { vertFontShader, fragFontShader } from "./shader-srcs.js";
 
 import {bus} from "@/bus.js"
 
-export var colorbarHeight = 0.05; //0 for no colorbars
-export var crosshairWidth = 1; //0 for no crosshairs
+export var textHeight = 0.0; //0 for no text, fraction of canvas height
+export var colorbarHeight = 0.05; //0 for no colorbars, fraction of NIfTI j dimension
+export var crosshairWidth = 1; //0 for no crosshairs, pixels
 export var backColor =  [0, 0, 0, 1];
 export const sliceTypeAxial = 0;
 export const sliceTypeCoronal = 1;
@@ -32,13 +34,15 @@ var sliceShader = null //program for 2D slice views
 var lineShader = null //program for cross-hairs
 var renderShader = null //program for 3D views
 var colorbarShader = null //program for 3D views
+var fontShader = null //program for displaying text
+var fontMetrics = null //position/height/width of each character in font texture
 var mousePos = [0,0];
 var numScreenSlices = 0; //e.g. for multiplanar view, 3 simultaneous slices: axial, coronal, sagittal
 var screenSlices = [ //location and type of each 2D slice on screen, allows clicking to detect position
-  {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial},
-  {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial},
-  {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial},
-  {leftBottomWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial}
+  {leftTopWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial},
+  {leftTopWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial},
+  {leftTopWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial},
+  {leftTopWidthHeight: [1, 0, 0, 1], axCorSag: sliceTypeAxial}
 ];
 var sliceOpacity = 1.0
 
@@ -170,6 +174,26 @@ export function loadVolume(overlayItem) {
 	return
 } // loadVolume()
 
+var loadFont = function(gl, pngName) {
+	var pngImage = null;
+	pngImage = new Image();
+	console.log('loading ', pngName);
+	pngImage.src = pngName;  // MUST BE SAME DOMAIN!!!
+	pngImage.onload = function() {
+		//console.log('matcap resolution ', matCapImage.width, '<<<', matCapImage.height);
+		var pngTexture = gl.createTexture();
+		gl.activeTexture(gl.TEXTURE3);
+		gl.bindTexture(gl.TEXTURE_2D, pngTexture);
+		// Set the parameters so we can render any size image.
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+		// Upload the image into the texture.
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, pngImage);
+	}
+} // selectJpeg()
+
 export function init(gl) {
 	//initial setup: only at the startup of the component
 	sliceShader = new Shader(gl, vertSliceShader, fragSliceShader);
@@ -184,6 +208,13 @@ export function init(gl) {
 	colorbarShader = new Shader(gl, vertColorbarShader, fragColorbarShader);
 	colorbarShader.use(gl);
 	gl.uniform1i(colorbarShader.uniforms["colormap"], 1);
+	//multi-channel signed distance font https://github.com/Chlumsky/msdfgen
+	fontShader = new Shader(gl, vertFontShader, fragFontShader);
+	fontShader.use(gl);
+	gl.uniform1i(fontShader.uniforms["fontTexture"], 3);
+	fontMetrics = require('./Roboto.json');
+	loadFont(gl, fontMetrics.pages[0]);
+	console.log(fontMetrics);
 } // init()
 
 export function updateGLVolume(gl, overlayItem) { //load volume or change contrast
@@ -301,9 +332,9 @@ export function mouseClick(gl, overlayItem, x, y) {
 	for (let i = 0; i < numScreenSlices; i++) {
 		var axCorSag = screenSlices[i].axCorSag;
 		if (axCorSag > sliceTypeSagittal) continue;
-		var lbwh = screenSlices[i].leftBottomWidthHeight;
-		var fracX = (x - lbwh[0]) / lbwh[2];
-		var fracY = (lbwh[1] - y) / lbwh[3];
+		var ltwh = screenSlices[i].leftTopWidthHeight;
+		var fracX = (x - ltwh[0]) / ltwh[2];
+		var fracY = ((y - ltwh[1]) / ltwh[3]);
 		if ((fracX >= 0.0) && (fracX < 1.0) && (fracY >= 0.0) && (fracY < 1.0)) { //user clicked on slice i
 			if (axCorSag === sliceTypeAxial) {
 				crosshairPos[0] = fracX;
@@ -323,27 +354,39 @@ export function mouseClick(gl, overlayItem, x, y) {
 	} //for i: each slice on screen
 } // mouseClick()
 
-function drawColorbar(gl, leftBottomWidthHeight) {
-	if ((leftBottomWidthHeight[2] <= 0) || (leftBottomWidthHeight[3] <= 0))
+function drawColorbar(gl, leftTopWidthHeight) {
+	if ((leftTopWidthHeight[2] <= 0) || (leftTopWidthHeight[3] <= 0))
 		return;
-	//console.log("bar:", leftBottomWidthHeight[0], leftBottomWidthHeight[1], leftBottomWidthHeight[2], leftBottomWidthHeight[3]);
+	//console.log("bar:", leftTopWidthHeight[0], leftTopWidthHeight[1], leftTopWidthHeight[2], leftTopWidthHeight[3]);
 	if (crosshairWidth > 0) {
 		//gl.disable(gl.DEPTH_TEST);
 		lineShader.use(gl)
 		gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
 		gl.uniform2fv(lineShader.uniforms["canvasWidthHeight"], [gl.canvas.width, gl.canvas.height]);
-		let lbwh = [leftBottomWidthHeight[0]-1, leftBottomWidthHeight[1]+1, leftBottomWidthHeight[2]+2, leftBottomWidthHeight[3]+2];
-		gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], lbwh[0], lbwh[1], lbwh[2], lbwh[3]);
+		let ltwh = [leftTopWidthHeight[0]-1, leftTopWidthHeight[1]-1, leftTopWidthHeight[2]+2, leftTopWidthHeight[3]+2];
+		gl.uniform4f(lineShader.uniforms["leftTopWidthHeight"], ltwh[0], ltwh[1], ltwh[2], ltwh[3]);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 	}
 	colorbarShader.use(gl);
 	gl.uniform2fv(colorbarShader.uniforms["canvasWidthHeight"], [gl.canvas.width, gl.canvas.height]);
-	gl.uniform4f(colorbarShader.uniforms["leftBottomWidthHeight"], leftBottomWidthHeight[0], leftBottomWidthHeight[1], leftBottomWidthHeight[2], leftBottomWidthHeight[3]);
+	gl.uniform4f(colorbarShader.uniforms["leftTopWidthHeight"], leftTopWidthHeight[0], leftTopWidthHeight[1], leftTopWidthHeight[2], leftTopWidthHeight[3]);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 	//gl.enable(gl.DEPTH_TEST);
 } // drawColorbar()
 
-function draw2D(gl, leftBottomWidthHeight, axCorSag) {
+function drawTextRight(gl, xy, char) { //to right of x, vertically centered on y
+	if (textHeight <= 0) return;
+	lineShader.use(gl)
+	gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
+	gl.uniform2fv(lineShader.uniforms["canvasWidthHeight"], [gl.canvas.width, gl.canvas.height]);
+	let y = (textHeight * gl.canvas.height);
+	let x = y;
+	console.log("drawText", char);
+	gl.uniform4f(lineShader.uniforms["leftTopWidthHeight"], xy[0], xy[1]- (0.5 * y), x, y);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+}
+
+function draw2D(gl, leftTopWidthHeight, axCorSag) {
 	var crossXYZ = [crosshairPos[0], crosshairPos[1],crosshairPos[2]]; //axial: width=i, height=j, slice=k
 	if (axCorSag === 1)
 		crossXYZ = [crosshairPos[0], crosshairPos[2],crosshairPos[1]]; //coronal: width=i, height=k, slice=j
@@ -355,10 +398,12 @@ function draw2D(gl, leftBottomWidthHeight, axCorSag) {
 	gl.uniform1i(sliceShader.uniforms["axCorSag"], axCorSag);
 	gl.uniform1f(sliceShader.uniforms["slice"], crossXYZ[2]);
 	gl.uniform2fv(sliceShader.uniforms["canvasWidthHeight"], [gl.canvas.width, gl.canvas.height]);
-	gl.uniform4f(sliceShader.uniforms["leftBottomWidthHeight"], leftBottomWidthHeight[0], leftBottomWidthHeight[1], leftBottomWidthHeight[2], leftBottomWidthHeight[3]);
+	gl.uniform4f(sliceShader.uniforms["leftTopWidthHeight"], leftTopWidthHeight[0], leftTopWidthHeight[1], leftTopWidthHeight[2], leftTopWidthHeight[3]);
+	//console.log(leftTopWidthHeight);
+	//gl.uniform4f(sliceShader.uniforms["leftTopWidthHeight"], leftTopWidthHeight[0], leftTopWidthHeight[1], leftTopWidthHeight[2], leftTopWidthHeight[3]);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 	//record screenSlices to detect mouse click positions
-	screenSlices[numScreenSlices].leftBottomWidthHeight = leftBottomWidthHeight;
+	screenSlices[numScreenSlices].leftTopWidthHeight = leftTopWidthHeight;
 	screenSlices[numScreenSlices].axCorSag = axCorSag;
 	numScreenSlices += 1;
 	if (crosshairWidth <= 0.0) return;
@@ -366,13 +411,15 @@ function draw2D(gl, leftBottomWidthHeight, axCorSag) {
 	gl.uniform4fv(lineShader.uniforms["lineColor"], crosshairColor);
 	gl.uniform2fv(lineShader.uniforms["canvasWidthHeight"], [gl.canvas.width, gl.canvas.height]);
 	//vertical line of crosshair:
-	var left = leftBottomWidthHeight[0] + (leftBottomWidthHeight[2] * crossXYZ[0]);
-	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], left - crosshairWidth, leftBottomWidthHeight[1],  crosshairWidth, leftBottomWidthHeight[3]);
+	var xleft = leftTopWidthHeight[0] + (leftTopWidthHeight[2] * crossXYZ[0]);
+	gl.uniform4f(lineShader.uniforms["leftTopWidthHeight"], xleft - (0.5*crosshairWidth), leftTopWidthHeight[1],  crosshairWidth, leftTopWidthHeight[3]);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 	//horizontal line of crosshair:
-	var bottom = leftBottomWidthHeight[1] - (leftBottomWidthHeight[3] * crossXYZ[1]);
-	gl.uniform4f(lineShader.uniforms["leftBottomWidthHeight"], leftBottomWidthHeight[0], bottom - crosshairWidth, leftBottomWidthHeight[2], crosshairWidth);
+	var xtop = leftTopWidthHeight[1] + (leftTopWidthHeight[3] * crossXYZ[1]);
+	gl.uniform4f(lineShader.uniforms["leftTopWidthHeight"], leftTopWidthHeight[0], xtop - (0.5*crosshairWidth), leftTopWidthHeight[2],  crosshairWidth);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+	if ((axCorSag === 0) || (axCorSag === 1))
+		drawTextRight(gl, [leftTopWidthHeight[0] + 1, leftTopWidthHeight[1] + (0.5 * leftTopWidthHeight[3]) ], "L");
 } // draw2D()
 
 function draw3D(gl, overlayItem) {
@@ -443,8 +490,9 @@ function scaleSlice(gl, w, h) {
 	//canvas space is 0,0...w,h with origin at upper left
 	let wPix = w * scalePix;
 	let hPix = h * scalePix;
-	let leftBottomWidthHeight = [(gl.canvas.clientWidth-wPix) * 0.5, gl.canvas.clientHeight -((gl.canvas.clientHeight-hPix) * 0.5), wPix, hPix];
-	return leftBottomWidthHeight;
+	let leftTopWidthHeight = [(gl.canvas.clientWidth-wPix) * 0.5, ((gl.canvas.clientHeight-hPix) * 0.5), wPix, hPix];
+	//let leftTopWidthHeight = [(gl.canvas.clientWidth-wPix) * 0.5, 80, wPix, hPix];
+	return leftTopWidthHeight;
 } // scaleSlice()
 
 export function drawSlices(gl, overlayItem) {
@@ -456,29 +504,29 @@ export function drawSlices(gl, overlayItem) {
 	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 	numScreenSlices = 0;
 	if (sliceType === sliceTypeAxial) { //draw axial
-		let leftBottomWidthHeight = scaleSlice(gl, volScale[0], volScale[1]);
-		draw2D(gl, leftBottomWidthHeight, 0);
+		let leftTopWidthHeight = scaleSlice(gl, volScale[0], volScale[1]);
+		draw2D(gl, leftTopWidthHeight, 0);
 	} else if (sliceType === sliceTypeCoronal) { //draw coronal
-		let leftBottomWidthHeight = scaleSlice(gl, volScale[0], volScale[2]);
-		draw2D(gl, leftBottomWidthHeight, 1);
+		let leftTopWidthHeight = scaleSlice(gl, volScale[0], volScale[2]);
+		draw2D(gl, leftTopWidthHeight, 1);
 	} else if (sliceType === sliceTypeSagittal) { //draw sagittal
-		let leftBottomWidthHeight = scaleSlice(gl, volScale[1], volScale[2]);
-		draw2D(gl, leftBottomWidthHeight, 2);
+		let leftTopWidthHeight = scaleSlice(gl, volScale[1], volScale[2]);
+		draw2D(gl, leftTopWidthHeight, 2);
 	} else { //sliceTypeMultiplanar
-		let lbwh = scaleSlice(gl, volScale[0]+volScale[1], volScale[1]+volScale[2]);
-		let wX = lbwh[2] * volScale[0]/(volScale[0]+volScale[1]);
-		let wY = lbwh[2] - wX;
-		let hY = lbwh[3] * volScale[1]/(volScale[1]+volScale[2]);
-		let hZ = lbwh[3] - hY;
+		let ltwh = scaleSlice(gl, volScale[0]+volScale[1], volScale[1]+volScale[2]);
+		let wX = ltwh[2] * volScale[0]/(volScale[0]+volScale[1]);
+		let wY = ltwh[2] - wX;
+		let hY = ltwh[3] * volScale[1]/(volScale[1]+volScale[2]);
+		let hZ = ltwh[3] - hY;
 		//draw axial
-		draw2D(gl, [lbwh[0],lbwh[1], wX, hY], 0);
+		draw2D(gl, [ltwh[0],ltwh[1]+hY, wX, hY], 0);
 		//draw coronal
-		draw2D(gl, [lbwh[0],lbwh[1]-hY, wX, hZ], 1);
+		draw2D(gl, [ltwh[0],ltwh[1], wX, hZ], 1);
 		//draw sagittal
-		draw2D(gl, [lbwh[0]+wX,lbwh[1]-hY, wY, hZ], 2);
+		draw2D(gl, [ltwh[0]+wX,ltwh[1], wY, hZ], 2);
 		//draw colorbar (optional)
 		var margin = colorBarMargin * hY;
-		drawColorbar(gl, [lbwh[0]+wX+margin, lbwh[1] - margin, wY - margin - margin, hY * colorbarHeight]);
+		drawColorbar(gl, [ltwh[0]+wX+margin, ltwh[1] + hY + margin, wY - margin - margin, hY * colorbarHeight]);
 	}
 	gl.finish();
 	let pos = frac2mm(overlayItem);
