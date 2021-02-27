@@ -141,6 +141,15 @@ export default {
         nv.mouseClick(this.gl, this.overlays[0], e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
         nv.mouseMove(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
       }
+      if (this.mouseDown && e.touches.length == 2) {
+        //var rect = canvas.getBoundingClientRect()
+        //nv.mouseClick(this.gl, this.overlays[0], e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+        //nv.mouseMove(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+        e.preventDefault()
+        nv.sliceScroll2D(e.scale * 0.01)
+
+      }
+
     })
 
 
@@ -149,6 +158,11 @@ export default {
         e.preventDefault()
         this.scale += e.deltaY * -0.01
         nv.setScale(this.scale)
+      } else {
+        // scroll 2D slices 
+        e.preventDefault()
+        nv.sliceScroll2D(e.deltaY * -0.01)
+         
       }
       
     })

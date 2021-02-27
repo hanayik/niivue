@@ -21,9 +21,9 @@ export const sliceTypeRender = 4;
 export var sliceType = sliceTypeMultiplanar; //view: axial, coronal, sagittal, multiplanar or render
 export var renderAzimuth = 120;
 export var renderElevation = 15;
+export var crosshairPos = [0.5, 0.5, 0.5];
 
 var crosshairColor =  [1, 0, 0, 1];
-var crosshairPos = [0.5, 0.5, 0.5];
 var volScaleMultiplier = 1;
 var _overlayItem = null
 var colorBarMargin = 0.05
@@ -67,6 +67,20 @@ export function mouseMove(x, y) {
 
 export function setCrosshairColor(color) {
   crosshairColor = color
+  drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
+}
+
+export function sliceScroll2D(posChange) {
+  //
+  var idx
+  if (sliceType == sliceTypeAxial) idx = 2;
+  if (sliceType == sliceTypeSagittal) idx = 0;
+  if (sliceType == sliceTypeCoronal) idx = 1;
+  var posNow = crosshairPos[idx]
+  var posFuture = posNow + posChange
+  if (posFuture > 1) posFuture = 1;
+  if (posFuture < 0) posFuture = 0;
+  crosshairPos[idx] = posFuture
   drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
 }
 
