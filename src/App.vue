@@ -31,6 +31,17 @@
           <v-btn @click='setSliceType(3)'>MP</v-btn>
           <v-spacer></v-spacer>
         </v-toolbar>
+        <v-toolbar v-if="viewShown2D == true">
+          <v-slider
+            v-model="sliceScrollVal"
+            step="0.01"
+            max="1"
+            min="0"
+            thumb-label
+            @input="onSliceSlider2D"
+          >
+          </v-slider>
+        </v-toolbar>
         <glviewer :overlays="overlayList"></glviewer>
       </v-col>
     </v-row>
@@ -61,13 +72,14 @@ export default {
   created () {
     bus.$on('crosshair-pos-change', (posString) => {
     this.coordinateString = posString 
-      //console.log(posString)
     });
 
   },
   data (){
     return {
       tab: null,
+      viewShown2D: false,
+      sliceScrollVal: 0.5,
       appTabs: ['Menu', 'Draw', 'Edit', 'Scripting'],
       coordinateString: '0x0x0',
       overlayList: [
@@ -97,9 +109,20 @@ export default {
 
   methods: {
     setSliceType: function(sliceType) {
-
+      if (sliceType < 3 ){
+        this.viewShown2D = true
+      } else {
+        this.viewShown2D = false
+      }
       bus.$emit('slice-type-change', sliceType);
+    },
+
+    onSliceSlider2D: function() {
+      if (this.viewShown2D){
+        bus.$emit('set-2D-slice', this.sliceScrollVal);
+      }           
     }
+
   },
 };
 </script>
