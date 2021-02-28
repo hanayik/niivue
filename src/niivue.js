@@ -70,17 +70,21 @@ export function setCrosshairColor(color) {
   drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
 }
 
-export function sliceScroll2D(posChange) {
+export function sliceScroll2D(posChange, isDelta=true) {
   //
   var idx
   if (sliceType == sliceTypeAxial) idx = 2;
   if (sliceType == sliceTypeSagittal) idx = 0;
   if (sliceType == sliceTypeCoronal) idx = 1;
-  var posNow = crosshairPos[idx]
-  var posFuture = posNow + posChange
-  if (posFuture > 1) posFuture = 1;
-  if (posFuture < 0) posFuture = 0;
-  crosshairPos[idx] = posFuture
+  if (isDelta){
+    var posNow = crosshairPos[idx]
+    var posFuture = posNow + posChange
+    if (posFuture > 1) posFuture = 1;
+    if (posFuture < 0) posFuture = 0;
+    crosshairPos[idx] = posFuture
+  } else {
+    crosshairPos[idx] = posChange
+  }
   drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
 }
 

@@ -18,8 +18,6 @@
         </v-row>
       </v-card>
     </v-dialog>
-
-   
   </div>
 </template>
 <script>
@@ -40,14 +38,20 @@ export default {
   },
   created () {
     bus.$on('slice-type-change', function (sliceType) {
-    nv.setSliceType(sliceType)
-});
+      nv.setSliceType(sliceType)
+    });
+
+    bus.$on('set-2D-slice', function (slicePosVal) {
+      nv.sliceScroll2D(slicePosVal, false)
+    });
+
 
   },
   
   data() {
     return {
       selectedOverlay: 0,
+      last2DSliceVal: 0.5,
       mouseDown: false,
       touchDown: false,
       zDown: false,
@@ -137,17 +141,20 @@ export default {
     })
 
     gl.canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
       if (this.touchDown && e.touches.length < 2) {
         var rect = canvas.getBoundingClientRect()
         nv.mouseClick(this.gl, this.overlays[0], e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
         nv.mouseMove(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
       }
+      /*
       if (this.touchDown && e.touches.length == 2) {
         // two fingers for a pinch
-        e.preventDefault()
         var dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY)
         nv.sliceScroll2D(dist * 0.01)
       }
+      */
     })
 
     gl.canvas.addEventListener('wheel', (e) => {
@@ -169,7 +176,7 @@ export default {
     })
 
     gl.canvas.addEventListener('touchend', () => {
-      this.mouseDown = false
+      this.touchDown = false
     })
 
 
