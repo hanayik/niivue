@@ -80,10 +80,8 @@
                 </v-slider>
               </v-col>
             </v-row>
-            
           </v-expansion-panel-content>
         </v-expansion-panel>
-
         </draggable>
       </v-expansion-panels>
     </v-row>

@@ -12,11 +12,6 @@
       </v-tabs>
       <v-spacer>
       </v-spacer>
-      <v-btn @click='setSliceType(0)'>A</v-btn>
-      <v-btn @click='setSliceType(2)'>S</v-btn>
-      <v-btn @click='setSliceType(1)'>C</v-btn>
-      <v-btn @click='setSliceType(4)'>R</v-btn>
-      <v-btn @click='setSliceType(3)'>MP</v-btn>
     </v-app-bar>
 
     <v-main>
@@ -28,13 +23,18 @@
       </v-col>
 
       <v-col sm=12 md=12 lg=8>
+        <v-toolbar class="pa-0">
+          <v-btn @click='setSliceType(0)'>A</v-btn>
+          <v-btn @click='setSliceType(2)'>S</v-btn>
+          <v-btn @click='setSliceType(1)'>C</v-btn>
+          <v-btn @click='setSliceType(4)'>R</v-btn>
+          <v-btn @click='setSliceType(3)'>MP</v-btn>
+          <v-spacer></v-spacer>
+        </v-toolbar>
         <glviewer :overlays="overlayList"></glviewer>
       </v-col>
-      
     </v-row>
-
     </v-main>
-
     <v-footer app>
       <v-row >
         <v-col align="center" justify="center" >
@@ -42,7 +42,6 @@
         </v-col>
       </v-row>
     </v-footer>
-
   </v-app>
 </template>
 
@@ -50,8 +49,6 @@
 import controls from './components/controls.vue'
 import glviewer from './components/glviewer.vue'
 import {bus} from "@/bus.js"
-
-
 
 export default {
   name: 'App',
