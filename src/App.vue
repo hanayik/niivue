@@ -33,11 +33,8 @@
         </v-toolbar>
         <glviewer :overlays="overlayList"></glviewer>
       </v-col>
-      
     </v-row>
-
     </v-main>
-
     <v-footer app>
       <v-row >
         <v-col align="center" justify="center" >
@@ -45,7 +42,6 @@
         </v-col>
       </v-row>
     </v-footer>
-
   </v-app>
 </template>
 
@@ -53,8 +49,6 @@
 import controls from './components/controls.vue'
 import glviewer from './components/glviewer.vue'
 import {bus} from "@/bus.js"
-
-
 
 export default {
   name: 'App',
