@@ -9,7 +9,7 @@ import { vertFontShader, fragFontShader } from "./shader-srcs.js";
 
 import {bus} from "@/bus.js"
 
-export var textHeight = 0.07; //0 for no text, fraction of canvas height
+export var textHeight = 0.04; //0 for no text, fraction of canvas height
 export var colorbarHeight = 0.05; //0 for no colorbars, fraction of NIfTI j dimension
 export var crosshairWidth = 1; //0 for no crosshairs, pixels
 export var backColor =  [0, 0, 0, 1];
@@ -51,7 +51,6 @@ bus.$on('colormap-change', function (selectedColorMap) {
     drawSlices(getGL(), _overlayItem)
 });
 
-
 export function mouseDown(x, y) {
 	if (sliceType != sliceTypeRender) return;
 	mousePos = [x,y];
@@ -68,7 +67,7 @@ export function mouseMove(x, y) {
 export function setCrosshairColor(color) {
   crosshairColor = color
   drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
-}
+} // setCrosshairColor()
 
 export function sliceScroll2D(posChange, isDelta=true) {
   //
@@ -86,8 +85,7 @@ export function sliceScroll2D(posChange, isDelta=true) {
     crosshairPos[idx] = posChange
   }
   drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
-}
-
+} // sliceScroll2D()
 
 export function setSliceType(st) {
   sliceType = st
@@ -97,8 +95,7 @@ export function setSliceType(st) {
 export function setSliceOpacity(op) {
   sliceOpacity = op
   drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
-}
-
+} // setSliceOpacity()
 
 export function setScale(scale) {
   volScaleMultiplier = scale
@@ -210,7 +207,7 @@ var loadPng = function(gl, pngName) {
 	}
 	pngImage.src = pngName;  // MUST BE SAME DOMAIN!!!
 	//console.log("loading PNG ", pngName);
-} // loadFont()
+} // loadPng()
 
 async function initText(gl) {
 	//load bitmap
@@ -436,7 +433,7 @@ function textWidth(scale, str) {
 	for (let i = 0; i < str.length; i++)
 		w += scale * fontMets[bytes[i]].xadv;
 	return w;
-} //TextWidth()
+} // textWidth()
 
 function drawChar(gl, xy, scale, char) { //draw single character, never call directly: ALWAYS call from drawText()
 	let metrics = fontMets[char];
@@ -449,7 +446,7 @@ function drawChar(gl, xy, scale, char) { //draw single character, never call dir
 	gl.uniform4fv(fontShader.uniforms["uvLeftTopWidthHeight"], metrics.uv_lbwh);
 	gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
 	return scale * metrics.xadv;
-}
+} // drawChar()
 
 function drawText(gl, xy, str) { //to right of x, vertically centered on y
 	if (textHeight <= 0) return;
@@ -457,18 +454,20 @@ function drawText(gl, xy, str) { //to right of x, vertically centered on y
 	let scale = (textHeight * gl.canvas.height);
 	gl.uniform2f(fontShader.uniforms["canvasWidthHeight"], gl.canvas.width, gl.canvas.height);
 	gl.uniform4fv(fontShader.uniforms["fontColor"], crosshairColor);
-	gl.uniform1f(fontShader.uniforms["screenPxRange"], scale / fontMets.size * fontMets.distanceRange);
+	let screenPxRange = scale / fontMets.size * fontMets.distanceRange;
+	screenPxRange = Math.max(screenPxRange, 1.0) //screenPxRange() must never be lower than 1
+	gl.uniform1f(fontShader.uniforms["screenPxRange"], screenPxRange);
 	var bytes = new Buffer(str);
 	for (let i = 0; i < str.length; i++)
 		xy[0] += drawChar(gl, xy, scale, bytes[i]);
-}
+} // drawText()
 
 function drawTextRight(gl, xy, str) { //to right of x, vertically centered on y
 	if (textHeight <= 0) return;
 	fontShader.use(gl)
 	xy[1] -= (0.5 * textHeight * gl.canvas.height);
 	drawText(gl, xy, str)
-}
+} // drawText()
 
 function drawTextBelow(gl, xy, str) { //horizontally centered on x, below y
 	if (textHeight <= 0) return;
@@ -476,7 +475,7 @@ function drawTextBelow(gl, xy, str) { //horizontally centered on x, below y
 	let scale = (textHeight * gl.canvas.height);
 	xy[0] -= 0.5 * textWidth(scale, str);
 	drawText(gl, xy, str)
-}
+} // drawTextBelow()
 
 function draw2D(gl, leftTopWidthHeight, axCorSag) {
 	var crossXYZ = [crosshairPos[0], crosshairPos[1],crosshairPos[2]]; //axial: width=i, height=j, slice=k
@@ -620,11 +619,11 @@ export function drawSlices(gl, overlayItem) {
 		draw2D(gl, [ltwh[0],ltwh[1], wX, hZ], 1);
 		//draw sagittal
 		draw2D(gl, [ltwh[0]+wX,ltwh[1], wY, hZ], 2);
-		//demonstrate multi-character string with font descenders
-		drawTextBelow(gl, [ltwh[0]+wX + (0.5 * wY), ltwh[1] + hZ ], "Syzygy");
 		//draw colorbar (optional)
 		var margin = colorBarMargin * hY;
-		drawColorbar(gl, [ltwh[0]+wX+margin, ltwh[1] + hY + margin, wY - margin - margin, hY * colorbarHeight]);
+		drawColorbar(gl, [ltwh[0]+wX+margin, ltwh[1] + hZ + margin, wY - margin - margin, hY * colorbarHeight]);
+		//demonstrate multi-character string with font descenders
+		drawTextBelow(gl, [ltwh[0]+ wX + (wY * 0.5), ltwh[1] + hZ + margin + hY * colorbarHeight], "Syzygy");
 	}
 	gl.finish();
 	let pos = frac2mm(overlayItem);
