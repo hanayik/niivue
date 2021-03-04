@@ -1,0 +1,28 @@
+{
+  "paths": [
+    {
+      "type": "file",
+      "value": "index.md"
+    },
+    {
+      "type": "file",
+      "value": "screenshots.md"
+    }
+  ],
+  "contents": [
+    {
+      "path": "index.md",
+      "url": "index.html",
+      "content": "# Niivue Docs\n\nThese docs are automatically generated during each build and deployed using Github pages.\n\n## Live demo\n\nThe live demo exists to show off Niivue in its current state. This is sort of like working with the garage door open. The `master` branch features and capabilities will be shown here. Sometimes demos may look odd when new features are being tested incrementally.   \n\n[Click here for a live demo](./live-demo/index.html)\n",
+      "html": "<h1 id=\"niivue-docs\">Niivue Docs <a class=\"heading-anchor-permalink\" href=\"#niivue-docs\">#</a></h1>\n<p>These docs are automatically generated during each build and deployed using Github pages.</p>\n<h2 id=\"live-demo\">Live demo <a class=\"heading-anchor-permalink\" href=\"#live-demo\">#</a></h2>\n<p>The live demo exists to show off Niivue in its current state. This is sort of like working with the garage door open. The <code>master</code> branch features and capabilities will be shown here. Sometimes demos may look odd when new features are being tested incrementally.</p>\n<p><a href=\"./live-demo/index.html\">Click here for a live demo</a></p>\n",
+      "id": 0
+    },
+    {
+      "path": "screenshots.md",
+      "url": "screenshots.html",
+      "content": "# Niivue Example screenshots\n\n### Desktop Browsers\n\n#### Chrome\n\n![example image1](./screenshots/desktop-chrome1.png)\n\n![example image2](./screenshots/desktop-chrome2.png)\n\n### Mobile Browsers\n\n#### Android\n\n![example image3](./screenshots/mobile-android-chrome1.jpg)\n\n![example image4](./screenshots/mobile-android-chrome2.jpg)\n\n#### iOS\n\n![example image5](./screenshots/mobile-ios-safari-experimental1.png)\n\n![example image5](./screenshots/mobile-ios-safari-experimental2.png)\n\n![example image5](./screenshots/mobile-ios-safari-experimental3.png)\n\n",
+      "html": "<h1 id=\"niivue-example-screenshots\">Niivue Example screenshots <a class=\"heading-anchor-permalink\" href=\"#niivue-example-screenshots\">#</a></h1>\n<h3 id=\"desktop-browsers\">Desktop Browsers <a class=\"heading-anchor-permalink\" href=\"#desktop-browsers\">#</a></h3>\n<h4 id=\"chrome\">Chrome <a class=\"heading-anchor-permalink\" href=\"#chrome\">#</a></h4>\n<p><img src=\"./screenshots/desktop-chrome1.png\" alt=\"example image1\"></p>\n<p><img src=\"./screenshots/desktop-chrome2.png\" alt=\"example image2\"></p>\n<h3 id=\"mobile-browsers\">Mobile Browsers <a class=\"heading-anchor-permalink\" href=\"#mobile-browsers\">#</a></h3>\n<h4 id=\"android\">Android <a class=\"heading-anchor-permalink\" href=\"#android\">#</a></h4>\n<p><img src=\"./screenshots/mobile-android-chrome1.jpg\" alt=\"example image3\"></p>\n<p><img src=\"./screenshots/mobile-android-chrome2.jpg\" alt=\"example image4\"></p>\n<h4 id=\"ios\">iOS <a class=\"heading-anchor-permalink\" href=\"#ios\">#</a></h4>\n<p><img src=\"./screenshots/mobile-ios-safari-experimental1.png\" alt=\"example image5\"></p>\n<p><img src=\"./screenshots/mobile-ios-safari-experimental2.png\" alt=\"example image5\"></p>\n<p><img src=\"./screenshots/mobile-ios-safari-experimental3.png\" alt=\"example image5\"></p>\n",
+      "id": 1
+    }
+  ]
+}
