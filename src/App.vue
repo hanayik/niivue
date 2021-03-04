@@ -84,7 +84,7 @@ export default {
       coordinateString: '0x0x0',
       overlayList: [
         {
-          volumeURL: "./mni152.nii.gz",
+          volumeURL: "./RAS.nii.gz",
           volume: {hdr: null, img: null},
           name: "mni152.nii.gz",
           intensityMin: 0,
@@ -94,6 +94,8 @@ export default {
           opacity: 100,
         },
         /*{
+	  volumeURL: "./mni152.nii.gz",
+		
           volumeURL: "./chris_T1.nii.gz",
           volume: {hdr: null, img: null},
           name: "chris_T1.nii.gz",
