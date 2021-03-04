@@ -84,27 +84,26 @@ export default {
       coordinateString: '0x0x0',
       overlayList: [
         {
-          volumeURL: "./RAS.nii.gz",
+          volumeURL: "./spm152.nii.gz",
           volume: {hdr: null, img: null},
-          name: "mni152.nii.gz",
+          name: "standard",
           intensityMin: 0,
           intensityMax: 100,
           intensityRange:[0, 100],
           colorMap: "gray", // gray
           opacity: 100,
         },
-        /*{
-	  volumeURL: "./mni152.nii.gz",
-		
-          volumeURL: "./chris_T1.nii.gz",
+        {
+          volumeURL: "./motor.nii.gz",
           volume: {hdr: null, img: null},
-          name: "chris_T1.nii.gz",
+          name: "motor",
           intensityMin: 0,
           intensityMax: 100,
           intensityRange:[0, 100],
-          colorMap: "gray", // gray
+          colorMap: "Warm", // gray
           opacity: 100,
-        }*/
+        },
+
       ]
     }
   },

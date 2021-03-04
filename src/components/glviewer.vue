@@ -226,8 +226,9 @@ export default {
     this.gl.enable(this.gl.BLEND);
     this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
     nv.init(this.gl);
+    //this.overlays.forEach((overlay, i) =>  nv.loadVolume(overlay, i))
     nv.loadVolume(this.overlays[this.selectedOverlay]); // just load first overlay. addtional overlays are not handled yet
-
+    
     bus.$on('opacity-change', (opacity) => {
       nv.setSliceOpacity(opacity)
     });

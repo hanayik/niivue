@@ -9,7 +9,7 @@ import { vertFontShader, fragFontShader } from "./shader-srcs.js";
 
 import {bus} from "@/bus.js"
 
-export var textHeight = 0.07; //0 for no text, fraction of canvas height
+export var textHeight = 0.03; //0 for no text, fraction of canvas height
 export var colorbarHeight = 0.05; //0 for no colorbars, fraction of NIfTI j dimension
 export var crosshairWidth = 1; //0 for no crosshairs, pixels
 export var backColor =  [0, 0, 0, 1];
@@ -155,9 +155,9 @@ function overlayRGBA(overlayItem) {
 				imgRGBA[j] = 0; //Blue
 				j++;
 				imgRGBA[j] = v * 0.5; //Alpha
-				j++;				
+				j++;
 			}
-		}	
+		}
 	}
 	return imgRGBA;
 } // overlayRGBA()
@@ -264,7 +264,7 @@ async function initText(gl) {
 	}
 	await fetchMetrics();
 	fontMets.distanceRange = metrics.atlas.distanceRange;
-	fontMets.size = metrics.atlas.size;	
+	fontMets.size = metrics.atlas.size;
 	let scaleW = metrics.atlas.width;
 	let scaleH = metrics.atlas.height;
 	for (let i = 0; i < metrics.glyphs.length; i++) {
@@ -356,7 +356,7 @@ export function updateGLVolume(gl, overlayItem) { //load volume or change contra
 	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
 	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-	gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1) 
+	gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
 	gl.texStorage3D(gl.TEXTURE_3D, 4, gl.RGBA8, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
 	gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], gl.RGBA, gl.UNSIGNED_BYTE, imgRGBA8);
 	drawSlices(gl, overlayItem)
