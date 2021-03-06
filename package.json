@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "serve": "vue-cli-service serve --host 127.0.0.1",
+    "serve": "vue-cli-service serve",
     "build": "vue-cli-service build && npm run docs",
     "rmdocs": "rm -rf docs && mkdir docs",
     "docs": "npm run rmdocs && markdown-folder-to-html md_docs && mv _md_docs/* docs/ && mkdir -p docs/live-demo && cp -r dist/* docs/live-demo/",

@@ -44,6 +44,11 @@ export default {
       nv.sliceScroll2D(slicePosVal, false)
     });
 
+    bus.$on('set-clip-planes', function (newPlanes) {
+      nv.clipPlaneMove(newPlanes)
+    });
+
+
 
   },
   
@@ -113,24 +118,9 @@ export default {
     const gl = canvas.getContext("webgl2");
 
     var gc = new Hammer(canvas); // gesture controller
+    gc.get('press').set({ time: 2000 });
     gc.get('pinch').set({ enable: true });
-    gc.get('rotate').set({ enable: true });
-    gc.get('pan').set({ direction: Hammer.DIRECTION_ALL });
-    gc.get('swipe').set({ direction: Hammer.DIRECTION_VERTICAL });
 
-    gc.on('tap', (e) => {
-      console.log('tap')
-      console.log(e)
-      this.dialog = false
-      this.mouseDown = true
-      var rect = canvas.getBoundingClientRect()
-      nv.mouseClick(this.gl, this.overlays[0], e.center.x - rect.left, e.center.y - rect.top)
-      nv.mouseDown(e.center.x - rect.left, e.center.y - rect.top)
-
-
-    })
-
-    /*
     gl.canvas.addEventListener('mousedown', (e) => {
       e.preventDefault()
       this.dialog = false
@@ -139,9 +129,7 @@ export default {
       nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
       nv.mouseDown(e.clientX - rect.left,e.clientY - rect.top)
     })
-    */
-
-
+    
     gl.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault()
       this.dialog = false
@@ -151,23 +139,34 @@ export default {
       nv.mouseDown(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
     })
 
-    /*
+    
     gl.canvas.addEventListener('mousemove', (e) => {
       if (this.mouseDown) {
         var rect = canvas.getBoundingClientRect()
         nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
         nv.mouseMove(e.clientX - rect.left,e.clientY - rect.top)
       }
-    })*/
-
-    gc.on('pan', (e) => {
-      console.log('pan')
-      var rect = canvas.getBoundingClientRect()
-      nv.mouseClick(this.gl, this.overlays[0], e.center.x - rect.left, e.center.y - rect.top)
-      nv.mouseMove(e.center.x - rect.left, e.center.y - rect.top)
     })
 
-    /*
+    gl.canvas.addEventListener('touchmove', (e) => {
+      if (this.touchDown && e.touches.length < 2) {
+        var rect = canvas.getBoundingClientRect()
+        nv.mouseClick(this.gl, this.overlays[0], e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+        nv.mouseMove(e.touches[0].clientX - rect.left,e.touches[0].clientY - rect.top)
+      }
+    })
+
+
+    gc.on('pinchin', () => {
+      // scroll 2D slices 
+      nv.sliceScroll2D(0.001)
+    })
+
+    gc.on('pinchout', () => {
+      // scroll 2D slices 
+      nv.sliceScroll2D(-0.001)
+    })
+
     gl.canvas.addEventListener('wheel', (e) => {
       if (this.zDown) {
         e.preventDefault()
@@ -178,33 +177,18 @@ export default {
         e.preventDefault()
         nv.sliceScroll2D(e.deltaY * -0.01)
       }
-    })*/
-
-    gl.canvas.addEventListener('wheel', (e) => {
-      if (this.zDown) {
-        e.preventDefault()
-        this.scale += e.deltaY * -0.01
-        nv.setScale(this.scale)
-      } else {
-        // scroll 2D slices 
-        e.preventDefault()
-        nv.sliceScroll2D(e.deltaY * -0.01)
-      }
     })
 
+    gc.on('press', () => {
+      this.dialog = true
+    })
 
     gl.canvas.addEventListener('mouseup', () => {
       this.mouseDown = false
     })
 
-    gl.canvas.addEventListener('touchend', () => {
+    gl.canvas.addEventListener('tocuhend', () => {
       this.touchDown = false
-    })
-
-
-    gl.canvas.addEventListener('contextmenu', (e) => {
-      e.preventDefault()
-      this.dialog = true
     })
 
 
