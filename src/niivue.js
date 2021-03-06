@@ -23,7 +23,7 @@ export var renderAzimuth = 120;
 export var renderElevation = 15;
 export var crosshairPos = [0.5, 0.5, 0.5];
 export var overlays = 1; //number of loaded overlays _DEMO_: 0
-export var clipPlane = [0.5, 0.5, 0.0, 0.1]; //x,y,z and depth of clip plane _DEMO_: [0.5, 0.5, 0.0, 2.0]
+export var clipPlane = [0, 0, 0, 0]; //x,y,z and depth of clip plane _DEMO_: [0.5, 0.5, 0.0, 2.0]
 export var isRadiologicalConvention = false;
 
 var crosshairColor =  [1, 0, 0, 1];
@@ -67,6 +67,18 @@ export function mouseMove(x, y) {
 	mousePos = [x,y];
 	drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
 } // mouseMove()
+
+export function clipPlaneMove(newPlanes) {
+	if (sliceType != sliceTypeRender) return;
+  /*
+  clipPlane.forEach(function(v, i) {
+    clipPlane[i] = clipPlane[i] + newPlanes[i]
+  })
+  */
+  clipPlane = newPlanes
+	drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
+} // mouseMove()
+
 
 export function setCrosshairColor(color) {
   crosshairColor = color

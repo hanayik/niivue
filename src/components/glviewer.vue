@@ -21,10 +21,9 @@
   </div>
 </template>
 <script>
+import * as Hammer from 'hammerjs';
 import * as nv from "../niivue.js";
 import {bus} from "@/bus.js"
-
-
 
 export default {
   name: "glviewer",
@@ -44,6 +43,11 @@ export default {
     bus.$on('set-2D-slice', function (slicePosVal) {
       nv.sliceScroll2D(slicePosVal, false)
     });
+
+    bus.$on('set-clip-planes', function (newPlanes) {
+      nv.clipPlaneMove(newPlanes)
+    });
+
 
 
   },
@@ -113,6 +117,10 @@ export default {
     const canvas = document.querySelector("#gl");
     const gl = canvas.getContext("webgl2");
 
+    var gc = new Hammer(canvas); // gesture controller
+    gc.get('press').set({ time: 2000 });
+    gc.get('pinch').set({ enable: true });
+
     gl.canvas.addEventListener('mousedown', (e) => {
       e.preventDefault()
       this.dialog = false
@@ -121,7 +129,7 @@ export default {
       nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
       nv.mouseDown(e.clientX - rect.left,e.clientY - rect.top)
     })
-
+    
     gl.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault()
       this.dialog = false
@@ -131,7 +139,7 @@ export default {
       nv.mouseDown(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
     })
 
-
+    
     gl.canvas.addEventListener('mousemove', (e) => {
       if (this.mouseDown) {
         var rect = canvas.getBoundingClientRect()
@@ -141,20 +149,22 @@ export default {
     })
 
     gl.canvas.addEventListener('touchmove', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
       if (this.touchDown && e.touches.length < 2) {
         var rect = canvas.getBoundingClientRect()
         nv.mouseClick(this.gl, this.overlays[0], e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
-        nv.mouseMove(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+        nv.mouseMove(e.touches[0].clientX - rect.left,e.touches[0].clientY - rect.top)
       }
-      /*
-      if (this.touchDown && e.touches.length == 2) {
-        // two fingers for a pinch
-        var dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY)
-        nv.sliceScroll2D(dist * 0.01)
-      }
-      */
+    })
+
+
+    gc.on('pinchin', () => {
+      // scroll 2D slices 
+      nv.sliceScroll2D(0.001)
+    })
+
+    gc.on('pinchout', () => {
+      // scroll 2D slices 
+      nv.sliceScroll2D(-0.001)
     })
 
     gl.canvas.addEventListener('wheel', (e) => {
@@ -166,23 +176,19 @@ export default {
         // scroll 2D slices 
         e.preventDefault()
         nv.sliceScroll2D(e.deltaY * -0.01)
-         
       }
-      
+    })
+
+    gc.on('press', () => {
+      this.dialog = true
     })
 
     gl.canvas.addEventListener('mouseup', () => {
       this.mouseDown = false
     })
 
-    gl.canvas.addEventListener('touchend', () => {
+    gl.canvas.addEventListener('tocuhend', () => {
       this.touchDown = false
-    })
-
-
-    gl.canvas.addEventListener('contextmenu', (e) => {
-      e.preventDefault()
-      this.dialog = true
     })
 
 
