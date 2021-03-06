@@ -477,21 +477,31 @@
       </a>
       <nav id="menu">
         <ul>
-<li><a class="active" href="index.html">index</a></li>
+<li><a class="" href="../index.html">index</a></li>
 <li class="heading"><span>dev</span></li>
 <ul>
-<li><a class="" href="dev/font.html">font</a></li>
-<li><a class="" href="dev/webgl.html">webgl</a></li>
+<li><a class="" href="font.html">font</a></li>
+<li><a class="active" href="webgl.html">webgl</a></li>
 </ul>
-<li><a class="" href="screenshots.html">screenshots</a></li>
+<li><a class="" href="../screenshots.html">screenshots</a></li>
 </ul>
       </nav>
       <article id="main" class="content">
-        <h1 id="niivue-docs">Niivue Docs <a class="heading-anchor-permalink" href="#niivue-docs">#</a></h1>
-<p>These docs are automatically generated during each build and deployed using Github pages.</p>
-<h2 id="live-demo">Live demo <a class="heading-anchor-permalink" href="#live-demo">#</a></h2>
-<p>The live demo exists to show off Niivue in its current state. This is sort of like working with the garage door open. The <code>master</code> branch features and capabilities will be shown here. Sometimes demos may look odd when new features are being tested incrementally.</p>
-<p><a href="./live-demo/index.html">Click here for a live demo</a></p>
+        <h2 id="introduction">Introduction <a class="heading-anchor-permalink" href="#introduction">#</a></h2>
+<p>This project requires WebGL2. This specification was <a href="https://en.wikipedia.org/wiki/WebGL">finalized in January 2017</a>. It is supported by the current Chrome and Firefox browsers, but users of Safari must enable this <code>experimental</code> feature. NiiVue exploits WebGL2 features that <a href="https://webgl2fundamentals.org/webgl/lessons/webgl2-whats-new.html">are not available in WebGL1</a>. Specifically, the images are represented using non-Power of two 3D textures. The shaders used by WebGL2 are written using the <a href="https://en.wikipedia.org/wiki/OpenGL_ES">OpenGL ES 3.0</a>version of the <a href="https://en.wikipedia.org/wiki/OpenGL_Shading_Language">OpenGL Shading Language (GLSL)</a>.</p>
+<p><a href="https://gamedev.stackexchange.com/questions/132262/how-to-use-texelfetch">https://gamedev.stackexchange.com/questions/132262/how-to-use-texelfetch</a>
+but in OpenGL when specifying an integer vertex attribute you must use glVertexAttribIPointer, not glVertexAttribPointer; see
+For glVertexAttribIPointer … Values are always left as integer values
+vec2 copies of the ivec2</p>
+<h5 id="textures">Textures <a class="heading-anchor-permalink" href="#textures">#</a></h5>
+<p>The term Textures refers to bitmap images that are stored on the graphics card. The WebGL context can only have a limited number of textures active at one time (with the command <code>activeTexture</code> deterimining which textures are available). You can think of these active textures as slots that are available for the shaders to access. NiiVue consistently uses the same slots for specific textures. This means that each draw call does not need to explicitly set the active textures. Therefore, these slots should be considered reserved and not used for other functions.</p>
+<ul>
+<li>TEXTURE0: Background volume. This 3D scalar bitmap stores the voxel intensities of the background image.</li>
+<li>TEXTURE1: Background volume colormap. This 1D RGBA bitmap converts the scalar background voxel intensities to RGBA values (e.g. Grayscale, Warm, Winter).</li>
+<li>TEXTURE2: Overlay volumes. This 3D RGBA bitmap stores the blended values of all loaded overlays.</li>
+<li>TEXTURE3: Font. This is a 2D bitmap that stores the <a href="https://github.com/Chlumsky/msdfgen">multi-channel signed distance field typeface</a></li>
+<li>TEXTURE7: Temporary 3D texture: this is used for compute shaders to reorient volumes (e.g. reformat an image from ASR to LIP orientation).</li>
+</ul>
 
       </article>
     </div>

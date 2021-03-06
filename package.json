@@ -4,12 +4,16 @@
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build && rm -rf docs/* && cp -r dist/* docs/",
+    "build": "vue-cli-service build && npm run docs",
+    "rmdocs": "rm -rf docs && mkdir docs",
+    "docs": "npm run rmdocs && markdown-folder-to-html md_docs && mv _md_docs/* docs/ && mkdir -p docs/live-demo && cp -r dist/* docs/live-demo/",
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
     "core-js": "^3.6.5",
     "gl-matrix": "^3.3.0",
+    "hammerjs": "^2.0.8",
+    "highlight.js": ">=10.4.1",
     "nifti-reader-js": "^0.5.4",
     "vue": "^2.6.12",
     "vuedraggable": "^2.24.3",
@@ -22,6 +26,7 @@
     "babel-eslint": "^10.1.0",
     "eslint": "^6.7.2",
     "eslint-plugin-vue": "^6.2.2",
+    "markdown-folder-to-html": "^2.4.0",
     "sass": "^1.32.0",
     "sass-loader": "^10.0.0",
     "vue-cli-plugin-vuetify": "~2.1.0",

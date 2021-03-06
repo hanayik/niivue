@@ -2,6 +2,7 @@
   <v-app>
     <v-app-bar app>
       <!-- make app bar scroll in horizontal direction -->
+      <!--
       <v-tabs v-model='tab'>
         <v-tabs-slider color='black'></v-tabs-slider>
         <v-tab
@@ -10,6 +11,8 @@
           {{ item }}
         </v-tab>
       </v-tabs>
+      -->
+      <h2>Niivue</h2>
       <v-spacer>
       </v-spacer>
     </v-app-bar>
@@ -31,7 +34,7 @@
           <v-btn @click='setSliceType(3)'>MP</v-btn>
           <v-spacer></v-spacer>
         </v-toolbar>
-        <v-toolbar v-if="viewShown2D == true">
+        <v-toolbar dense v-if="viewShown2D == true">
           <v-slider
             v-model="sliceScrollVal"
             step="0.01"
@@ -39,9 +42,59 @@
             min="0"
             thumb-label
             @input="onSliceSlider2D"
+            label="slice"
           >
           </v-slider>
         </v-toolbar>
+        <v-toolbar dense v-if="viewShown3D == true">
+          <v-slider
+              v-model="clipValX"
+              step="0.005"
+              max="1"
+              min="-1"
+              thumb-label
+              @input="onClipPlaneChange"
+              label="clip x"
+            >
+          </v-slider>
+        </v-toolbar>
+        <v-toolbar dense v-if="viewShown3D == true">
+          <v-slider
+              v-model="clipValY"
+              step="0.005"
+              max="1"
+              min="-1"
+              thumb-label
+              @input="onClipPlaneChange"
+              label="clip y"
+            >
+          </v-slider>
+      </v-toolbar>
+      <v-toolbar dense v-if="viewShown3D == true">
+          <v-slider
+              v-model="clipValZ"
+              step="0.005"
+              max="1"
+              min="-1"
+              thumb-label
+              @input="onClipPlaneChange"
+              label="clip z"
+            >
+          </v-slider>
+      </v-toolbar>
+      <v-toolbar dense v-if="viewShown3D == true">
+          <v-slider
+              v-model="clipValW"
+              step="0.005"
+              max="0.5"
+              min="-0.5"
+              thumb-label
+              @input="onClipPlaneChange"
+              label="clip w"
+            >
+          </v-slider>
+      </v-toolbar>
+
         <glviewer :overlays="overlayList"></glviewer>
       </v-col>
     </v-row>
@@ -79,32 +132,36 @@ export default {
     return {
       tab: null,
       viewShown2D: false,
+      viewShown3D: false,
+      clipValX: 0,
+      clipValY: 0,
+      clipValZ: 0,
+      clipValW: 0,
       sliceScrollVal: 0.5,
       appTabs: ['Menu', 'Draw', 'Edit', 'Scripting'],
       coordinateString: '0x0x0',
       overlayList: [
         {
-          volumeURL: "./RAS.nii.gz",
+          volumeURL: "./spm152.nii.gz",
           volume: {hdr: null, img: null},
-          name: "mni152.nii.gz",
+          name: "standard",
           intensityMin: 0,
           intensityMax: 100,
           intensityRange:[0, 100],
           colorMap: "gray", // gray
           opacity: 100,
         },
-        /*{
-	  volumeURL: "./mni152.nii.gz",
-		
-          volumeURL: "./chris_T1.nii.gz",
+        {
+          volumeURL: "./motor.nii.gz",
           volume: {hdr: null, img: null},
-          name: "chris_T1.nii.gz",
+          name: "motor",
           intensityMin: 0,
           intensityMax: 100,
           intensityRange:[0, 100],
-          colorMap: "gray", // gray
+          colorMap: "Warm", // gray
           opacity: 100,
-        }*/
+        },
+
       ]
     }
   },
@@ -113,8 +170,13 @@ export default {
     setSliceType: function(sliceType) {
       if (sliceType < 3 ){
         this.viewShown2D = true
+        this.viewShown3D = false
+      } else if (sliceType == 4) {
+        this.viewShown2D = false
+        this.viewShown3D = true
       } else {
         this.viewShown2D = false
+        this.viewShown3D = false
       }
       bus.$emit('slice-type-change', sliceType);
     },
@@ -123,7 +185,15 @@ export default {
       if (this.viewShown2D){
         bus.$emit('set-2D-slice', this.sliceScrollVal);
       }           
+    },
+
+    onClipPlaneChange: function() {
+      if (this.viewShown3D){
+        bus.$emit('set-clip-planes', [this.clipValX, this.clipValY, this.clipValZ, this.clipValW]);
+
+      }           
     }
+
 
   },
 };
