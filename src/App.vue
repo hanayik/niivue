@@ -103,6 +103,9 @@
               >
             </v-slider>
           </v-row>
+          <v-row>
+            <v-btn @click="onResetClipPlane" class='mx-auto'>reset</v-btn>
+          </v-row>
           </v-expansion-panel-content>
         </v-expansion-panel>
       </v-expansion-panels>
@@ -201,6 +204,17 @@ export default {
 
     onClipPlaneChange: function() {
       if (this.viewShown3D){
+        bus.$emit('set-clip-planes', [this.clipValX, this.clipValY, this.clipValZ, this.clipValW]);
+
+      }           
+    },
+
+    onResetClipPlane: function() {
+      if (this.viewShown3D){
+        this.clipValX = 0
+        this.clipValY = 0
+        this.clipValZ = 0
+        this.clipValW = 0
         bus.$emit('set-clip-planes', [this.clipValX, this.clipValY, this.clipValZ, this.clipValW]);
 
       }           

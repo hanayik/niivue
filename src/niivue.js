@@ -75,25 +75,22 @@ export function mouseMove(x, y) {
 	drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
 } // mouseMove()
 
-export function clipPlaneMove(newPlanes) {
+export function clipPlaneMove(newPlane) {
 	if (sliceType != sliceTypeRender) return;
-  /*
-  clipPlane.forEach(function(v, i) {
-    clipPlane[i] = clipPlane[i] + newPlanes[i]
-  })
-  */
-  clipPlane = newPlanes
+  clipPlane = newPlane
 	drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
-} // mouseMove()
-
+} // clipPlaneMove
 
 export function setCrosshairColor(color) {
   crosshairColor = color
   drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
 } // setCrosshairColor()
 
-export function sliceScroll2D(posChange, isDelta=true) {
-  //
+export function sliceScroll2D(posChange, x, y, isDelta=true) {
+  if (sliceType === sliceTypeMultiplanar){
+    //mouseMPScroll(posChange, x, y) // not working when mouse over axial or Sag slices (works over Cor for some reason)
+    return
+  }
   var idx
   if (sliceType == sliceTypeAxial) idx = 2;
   if (sliceType == sliceTypeSagittal) idx = 0;
@@ -557,6 +554,59 @@ function sliceScale(gl, overlayItem) {
 	var vox = [hdr.dims[1], hdr.dims[2], hdr.dims[3]];
 	return { volScale, vox }
 } // sliceScale()
+
+export function mouseMPScroll(scrollVal, x, y) {
+  var gl = getGL()
+  var overlayItem = _overlayItem
+	if (sliceType === sliceTypeRender)
+		return
+	//console.log("Click pixels (x,y):", x, y);
+	if ((numScreenSlices < 1) || (gl.canvas.height < 1) || (gl.canvas.width < 1))
+		return;
+	//mouse click X,Y in screen coordinates, origin at top left
+	// webGL clip space L,R,T,B = [-1, 1, 1, 1]
+	// n.b. webGL Y polarity reversed
+	// https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
+	for (let i = 0; i < numScreenSlices; i++) {
+		var axCorSag = screenSlices[i].axCorSag;
+		if (axCorSag > sliceTypeSagittal) continue;
+		var ltwh = screenSlices[i].leftTopWidthHeight;
+		let isMirror = false;
+		if (ltwh[2] < 0) {
+			isMirror = true;
+			ltwh[0] += ltwh[2];
+			ltwh[2] = - ltwh[2];
+		}
+		var fracX = (x - ltwh[0]) / ltwh[2];
+		if (isMirror) fracX = 1.0 - fracX;
+		var fracY = 1.0 - ((y - ltwh[1]) / ltwh[3]);
+
+		if ((fracX >= 0.0) && (fracX < 1.0) && (fracY >= 0.0) && (fracY < 1.0)) { //user clicked on slice i
+      var posNow = crosshairPos[axCorSag]
+      var posFuture = posNow + scrollVal
+      if (posFuture > 1) posFuture = 1;
+      if (posFuture < 0) posFuture = 0;
+			if (axCorSag === sliceTypeAxial) {
+				//crosshairPos[0] = fracX;
+				//crosshairPos[1] = fracY;
+        crosshairPos[2] = posFuture
+			}
+			if (axCorSag === sliceTypeCoronal) {
+				//crosshairPos[0] = fracX;
+				//crosshairPos[2] = fracY;
+        crosshairPos[1] = posFuture
+			}
+			if (axCorSag === sliceTypeSagittal) {
+				//crosshairPos[1] = fracX;
+				//crosshairPos[2] = fracY;
+        crosshairPos[0] = posFuture
+			}
+			drawSlices(gl, overlayItem);
+			return;
+		} //if click in slice i
+	} //for i: each slice on screen
+} // mouseMPScroll()
+
 
 export function mouseClick(gl, overlayItem, x, y) {
 	if (sliceType === sliceTypeRender)
