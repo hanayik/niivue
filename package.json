@@ -13,6 +13,7 @@
     "core-js": "^3.6.5",
     "gl-matrix": "^3.3.0",
     "hammerjs": "^2.0.8",
+    "highlight.js": ">=10.4.1",
     "nifti-reader-js": "^0.5.4",
     "vue": "^2.6.12",
     "vuedraggable": "^2.24.3",
