@@ -104,7 +104,7 @@
             </v-slider>
           </v-row>
           <v-row>
-            <v-btn @click="onResetClipPlane" class='mx-auto'>reset</v-btn>
+            <v-btn v-if="viewShown3D" @click="onResetClipPlane" class='mx-auto'>reset</v-btn>
           </v-row>
           </v-expansion-panel-content>
         </v-expansion-panel>
