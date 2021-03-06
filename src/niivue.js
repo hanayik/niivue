@@ -55,6 +55,13 @@ bus.$on('colormap-change', function (selectedColorMap) {
     drawSlices(getGL(), _overlayItem)
 });
 
+function arrayEquals(a, b) {
+  return Array.isArray(a) &&
+    Array.isArray(b) &&
+    a.length === b.length &&
+    a.every((val, index) => val === b[index]);
+}
+
 export function mouseDown(x, y) {
 	if (sliceType != sliceTypeRender) return;
 	mousePos = [x,y];
@@ -260,7 +267,7 @@ function reorient(hdr) {
 	rotM[3+(2*4)] = ((hdr.dims[perm[2]])-1) * flip[2];
 	let residualR = mat.mat4.create();
 	mat.mat4.invert(residualR, rotM);
-	mat.mat4.multiply(residualR, residualR, R); 
+	mat.mat4.multiply(residualR, residualR, R);
 	for (let i = 0; i < 3; i++)
 		if (flip[i] !== 0) perm[i] = -perm[i];
     return {perm, residualR, requiresRot};
