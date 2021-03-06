@@ -204,6 +204,119 @@ export function calibrateIntensity(A, overlayItem) {
 	}
 } // calibrateIntensity()
 
+function reorient(hdr) {
+// port of Matlab reorient() https://github.com/xiangruili/dicm2nii/blob/master/nii_viewer.m
+// not elegant, as JavaScript arrays are always 1D
+	let a = hdr.affine;
+	let absR = mat.mat3.fromValues(Math.abs(a[0][0]),Math.abs(a[0][1]),Math.abs(a[0][2]), Math.abs(a[1][0]),Math.abs(a[1][1]),Math.abs(a[1][2]), Math.abs(a[2][0]),Math.abs(a[2][1]),Math.abs(a[2][2]));
+	//mat.mat3.transpose(A,A);
+	//first column = x
+	let ixyz = [1, 1, 1];
+    if (absR[3] > absR[0]) ixyz[0] = 2;//(absR[1][0] > absR[0][0]) ixyz[0] = 2;
+    if ((absR[6] > absR[0]) && (absR[6]> absR[3])) ixyz[0] = 3;//((absR[2][0] > absR[0][0]) && (absR[2][0]> absR[1][0])) ixyz[0] = 3;
+    ixyz[1] = 1;
+    if (ixyz[0] === 1) {
+		if (absR[4] > absR[7]) //(absR[1][1] > absR[2][1])
+			ixyz[1] = 2
+		else
+			ixyz[1] = 3;
+	} else if (ixyz[0] === 2) {
+       if  (absR[1] > absR[7])//(absR[0][1] > absR[2][1])
+          ixyz[1] = 1
+       else
+           ixyz[1] = 3;
+    } else {
+       if (absR[1] > absR[4])//(absR[0][1] > absR[1][1])
+          ixyz[1] = 1
+       else
+           ixyz[1] = 2;
+    }
+    //third column = z: constrained as x+y+z = 1+2+3 = 6
+    ixyz[2] = 6 - ixyz[1] - ixyz[0];
+	let perm = [1,2,3];
+    perm[ixyz[0]-1] = 1;
+    perm[ixyz[1]-1] = 2;
+    perm[ixyz[2]-1] = 3;
+	let rotM = mat.mat4.fromValues(a[0][0],a[0][1],a[0][2],a[0][3], a[1][0],a[1][1],a[1][2],a[1][3], a[2][0],a[2][1],a[2][2],a[2][3], 0,0,0,1);
+	let R = mat.mat4.create();
+	mat.mat4.copy(R, rotM);
+	for (let i = 0; i < 3; i++)
+		for (let j = 0; j < 3; j++)
+			R[(i*4)+j] =  rotM[(i*4)+perm[j]-1] ;//rotM[i+(4*(perm[j]-1))];//rotM[i],[perm[j]-1];
+	let flip = [0, 0, 0];
+    if (R[0] < 0) flip[0] = 1; //R[0][0]
+    if (R[5] < 0) flip[1] = 1; //R[1][1]
+    if (R[10] < 0) flip[2] = 1; //R[2][2]
+	let requiresRot = false;
+	if (arrayEquals(perm, [1,2,3]) && arrayEquals(flip, [0,0,0]))
+		return {perm, R, requiresRot};
+	requiresRot = true;
+	mat.mat4.identity(rotM);
+    rotM[0+(0 * 4)] = 1-flip[0]*2;
+    rotM[1+(1 * 4)] = 1-flip[1]*2;
+    rotM[2+(2 * 4)] = 1-flip[2]*2;
+    rotM[3+(0*4)] = ((hdr.dims[perm[0]])-1) * flip[0];
+    rotM[3+(1*4)] = ((hdr.dims[perm[1]])-1) * flip[1];
+	rotM[3+(2*4)] = ((hdr.dims[perm[2]])-1) * flip[2];
+	let residualR = mat.mat4.create();
+	mat.mat4.invert(residualR, rotM);
+	mat.mat4.multiply(residualR, residualR, R); 
+	for (let i = 0; i < 3; i++)
+		if (flip[i] !== 0) perm[i] = -perm[i];
+    return {perm, residualR, requiresRot};
+} // reorient()
+
+function reorientVolume(hdr, img) {
+	//rotate 3D volume to match approximately match RAS
+	//lots of room for speed/memory opitmization, e.g. LAS -> RAS all in plane
+	let {perm, residualR, requiresRot} = reorient(hdr);
+	if (!requiresRot) return; //already rotated
+	console.log("FLIP!");
+	var imgRaw = null
+	if (hdr.datatypeCode === 2) //data already uint8
+		imgRaw = new Uint8Array(img);
+	else if (hdr.datatypeCode === 4)
+		imgRaw = new Int16Array(img);
+	else if (hdr.datatypeCode === 16)
+		imgRaw = new Float32Array(img);
+	else if (hdr.datatypeCode === 512)
+		imgRaw = new Uint16Array(img);
+	let aperm = [Math.abs(perm[0]), Math.abs(perm[1]), Math.abs(perm[2])];
+	let outdim = [hdr.dims[aperm[0]], hdr.dims[aperm[1]], hdr.dims[aperm[2]] ];
+	let inRaw = [...imgRaw];
+	let inStep = [1, hdr.dims[1], hdr.dims[1] * hdr.dims[2]]; //increment i,j,k
+	let outStep = [inStep[aperm[0]-1], inStep[aperm[1]-1], inStep[aperm[2]-1] ];
+	let outStart = [0,0,0];
+	for (let p = 0; p < 3; p++) { //flip dimensions
+		if (perm[p] < 0) {
+			outStart[p] = (outStep[p] * (outdim[p] - 1));
+			outStep[p] = -outStep[p];
+		}
+	}
+	let j = 0;
+	for (let z = 0; z < outdim[2]; z++) {
+		let zi = outStart[2] + (z * outStep[2]);
+		for (let y = 0; y < outdim[1]; y++) {
+			let yi = outStart[1] + (y * outStep[1]);
+			for (let x = 0; x < outdim[0]; x++) {
+				let xi = outStart[0] + (x * outStep[0]);
+				imgRaw[j] = inRaw[xi+yi+zi];
+				j ++;
+			} //for x
+		} //for y
+	} //for z
+	hdr.dims[1] = outdim[0];
+	hdr.dims[2] = outdim[1];
+	hdr.dims[3] = outdim[2];
+	let outpix = [hdr.pixDims[aperm[0]], hdr.pixDims[aperm[1]], hdr.pixDims[aperm[2]] ];
+	hdr.pixDims[1] = outpix[0];
+	hdr.pixDims[2] = outpix[1];
+	hdr.pixDims[3] = outpix[2];
+	hdr.affine[0] = [residualR[0], residualR[1], residualR[2], residualR[3] ];
+	hdr.affine[1] = [residualR[4], residualR[5], residualR[6], residualR[7] ];
+	hdr.affine[2] = [residualR[8], residualR[9], residualR[10], residualR[11] ];
+} // reorientVolume()
+
 export function loadVolume(overlayItem) {
 	var hdr = null
 	var img = null
@@ -223,6 +336,7 @@ export function loadVolume(overlayItem) {
 			} else {
 				img = nii.readImage(hdr, dataBuffer);
 			}
+			reorientVolume(hdr, img);
 		} else {
 			alert("Unable to load buffer properly from volume?");
 			console.log("no buffer?");
