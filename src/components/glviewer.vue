@@ -41,7 +41,7 @@ export default {
     });
 
     bus.$on('set-2D-slice', function (slicePosVal) {
-      nv.sliceScroll2D(slicePosVal, false)
+      nv.sliceScroll2D(slicePosVal, null, null, false) // x,y = null
     });
 
     bus.$on('set-clip-planes', function (newPlanes) {
@@ -143,7 +143,9 @@ export default {
     gl.canvas.addEventListener('mousemove', (e) => {
       if (this.mouseDown) {
         var rect = canvas.getBoundingClientRect()
+        // mouseClick if any 2D mode
         nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
+        // mouseMove if 3D render mode
         nv.mouseMove(e.clientX - rect.left,e.clientY - rect.top)
       }
     })
@@ -159,12 +161,12 @@ export default {
 
     gc.on('pinchin', () => {
       // scroll 2D slices 
-      nv.sliceScroll2D(0.001)
+      nv.sliceScroll2D(0.001, null, null)
     })
 
     gc.on('pinchout', () => {
       // scroll 2D slices 
-      nv.sliceScroll2D(-0.001)
+      nv.sliceScroll2D(-0.001, null, null)
     })
 
     gl.canvas.addEventListener('wheel', (e) => {
@@ -175,7 +177,14 @@ export default {
       } else {
         // scroll 2D slices 
         e.preventDefault()
-        nv.sliceScroll2D(e.deltaY * -0.01)
+        e.stopPropagation()
+        var rect = canvas.getBoundingClientRect()
+        if (e.deltaY < 0){
+          nv.sliceScroll2D(-0.01, e.clientX - rect.left, e.clientY - rect.top)
+        } else {
+          nv.sliceScroll2D(0.01, e.clientX - rect.left, e.clientY - rect.top)
+        }
+        
       }
     })
 

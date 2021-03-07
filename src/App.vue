@@ -26,7 +26,7 @@
       </v-col>
 
       <v-col sm=12 md=12 lg=8>
-        <v-toolbar class="pa-0">
+        <v-toolbar elevation=0 class="pa-0 ma-0">
           <v-btn @click='setSliceType(0)'>A</v-btn>
           <v-btn @click='setSliceType(2)'>S</v-btn>
           <v-btn @click='setSliceType(1)'>C</v-btn>
@@ -34,66 +34,81 @@
           <v-btn @click='setSliceType(3)'>MP</v-btn>
           <v-spacer></v-spacer>
         </v-toolbar>
-        <v-toolbar dense v-if="viewShown2D == true">
-          <v-slider
-            v-model="sliceScrollVal"
-            step="0.01"
-            max="1"
-            min="0"
-            thumb-label
-            @input="onSliceSlider2D"
-            label="slice"
-          >
-          </v-slider>
-        </v-toolbar>
-        <v-toolbar dense v-if="viewShown3D == true">
-          <v-slider
-              v-model="clipValX"
-              step="0.005"
+      <v-expansion-panels v-if="viewShown2D == true || viewShown3D == true">
+          <v-expansion-panel>
+          <v-expansion-panel-header>
+            <v-row no-gutters class="align-center">
+              Controls
+              <v-icon class="mx-2"> mdi-arrow-expand-vertical </v-icon>
+            </v-row>
+          </v-expansion-panel-header>
+          <v-expansion-panel-content>
+            <v-row v-if="viewShown2D == true">
+            <v-slider
+              v-model="sliceScrollVal"
+              step="0.01"
               max="1"
-              min="-1"
+              min="0"
               thumb-label
-              @input="onClipPlaneChange"
-              label="clip x"
+              @input="onSliceSlider2D"
+              label="slice"
             >
-          </v-slider>
-        </v-toolbar>
-        <v-toolbar dense v-if="viewShown3D == true">
-          <v-slider
-              v-model="clipValY"
-              step="0.005"
-              max="1"
-              min="-1"
-              thumb-label
-              @input="onClipPlaneChange"
-              label="clip y"
-            >
-          </v-slider>
-      </v-toolbar>
-      <v-toolbar dense v-if="viewShown3D == true">
-          <v-slider
-              v-model="clipValZ"
-              step="0.005"
-              max="1"
-              min="-1"
-              thumb-label
-              @input="onClipPlaneChange"
-              label="clip z"
-            >
-          </v-slider>
-      </v-toolbar>
-      <v-toolbar dense v-if="viewShown3D == true">
-          <v-slider
-              v-model="clipValW"
-              step="0.005"
-              max="0.5"
-              min="-0.5"
-              thumb-label
-              @input="onClipPlaneChange"
-              label="clip w"
-            >
-          </v-slider>
-      </v-toolbar>
+            </v-slider>
+          </v-row>
+          <v-row v-if="viewShown3D == true">
+            <v-slider
+                v-model="clipValX"
+                step="0.005"
+                max="1"
+                min="-1"
+                thumb-label
+                @input="onClipPlaneChange"
+                label="clip x"
+              >
+            </v-slider>
+          </v-row>
+          <v-row v-if="viewShown3D == true">
+            <v-slider
+                v-model="clipValY"
+                step="0.005"
+                max="1"
+                min="-1"
+                thumb-label
+                @input="onClipPlaneChange"
+                label="clip y"
+              >
+            </v-slider>
+          </v-row>
+          <v-row v-if="viewShown3D == true">
+            <v-slider
+                v-model="clipValZ"
+                step="0.005"
+                max="1"
+                min="-1"
+                thumb-label
+                @input="onClipPlaneChange"
+                label="clip z"
+              >
+            </v-slider>
+          </v-row>
+          <v-row v-if="viewShown3D == true">
+            <v-slider
+                v-model="clipValW"
+                step="0.005"
+                max="0.5"
+                min="-0.5"
+                thumb-label
+                @input="onClipPlaneChange"
+                label="clip w"
+              >
+            </v-slider>
+          </v-row>
+          <v-row>
+            <v-btn v-if="viewShown3D" @click="onResetClipPlane" class='mx-auto'>reset</v-btn>
+          </v-row>
+          </v-expansion-panel-content>
+        </v-expansion-panel>
+      </v-expansion-panels>
 
         <glviewer :overlays="overlayList"></glviewer>
       </v-col>
@@ -189,6 +204,17 @@ export default {
 
     onClipPlaneChange: function() {
       if (this.viewShown3D){
+        bus.$emit('set-clip-planes', [this.clipValX, this.clipValY, this.clipValZ, this.clipValW]);
+
+      }           
+    },
+
+    onResetClipPlane: function() {
+      if (this.viewShown3D){
+        this.clipValX = 0
+        this.clipValY = 0
+        this.clipValZ = 0
+        this.clipValW = 0
         bus.$emit('set-clip-planes', [this.clipValX, this.clipValY, this.clipValZ, this.clipValW]);
 
       }           
