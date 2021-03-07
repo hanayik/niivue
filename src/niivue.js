@@ -814,9 +814,32 @@ function draw3D(gl, overlayItem) {
 	return posString;
 } // draw3D()
 
-function frac2mm(overlayItem) {
-	//compute crosshair in mm, not fractions:
-	let pos = mat.vec4.fromValues(crosshairPos[0],crosshairPos[1],crosshairPos[2],1);
+export function mm2frac(overlayItem, mm) {
+	//given mm, return volume fraction
+	//convert from object space in millimeters to normalized texture space XYZ= [0..1, 0..1 ,0..1]
+	let mm4 = mat.vec4.fromValues( mm[0], mm[1], mm[2],1);
+	let d = overlayItem.volume.hdr.dims;
+	let frac = [0, 0, 0];
+	if ((d[1] < 1) || (d[2] < 1) || (d[3] < 1)) 
+		return frac;
+	let sf = overlayItem.volume.hdr.affine;
+	let sform = mat.mat4.fromValues(
+		sf[0][0], sf[1][0], sf[2][0], sf[3][0],
+		sf[0][1], sf[1][1], sf[2][1], sf[3][1],
+		sf[0][2], sf[1][2], sf[2][2], sf[3][2],
+		sf[0][3], sf[1][3], sf[2][3], sf[3][3]);
+	mat.mat4.invert(sform, sform);
+	mat.vec4.transformMat4(mm4, mm4, sform);
+	frac[0] = (mm4[0] + 0.5) / d[1];
+	frac[1] = (mm4[1] + 0.5) / d[2];
+	frac[2] = (mm4[2] + 0.5) / d[3];
+	console.log("mm", mm, " -> frac", frac);
+	return frac;
+} // mm2frac()
+
+export function frac2mm(overlayItem, frac) {
+	//convert from normalized texture space XYZ= [0..1, 0..1 ,0..1] to object space in millimeters
+	let pos = mat.vec4.fromValues(frac[0], frac[1], frac[2], 1);
 	let d = overlayItem.volume.hdr.dims;
 	let dim = mat.vec4.fromValues(d[1], d[2], d[3], 1);
 	let sf = overlayItem.volume.hdr.affine;
@@ -879,7 +902,7 @@ export function drawSlices(gl, overlayItem) {
 		// drawTextBelow(gl, [ltwh[0]+ wX + (wY * 0.5), ltwh[1] + hZ + margin + hY * colorbarHeight], "Syzygy"); //DEMO
 	}
 	gl.finish();
-	let pos = frac2mm(overlayItem);
+	let pos = frac2mm(overlayItem, [crosshairPos[0],crosshairPos[1],crosshairPos[2]]);
 	let posString = pos[0].toFixed(2)+'×'+pos[1].toFixed(2)+'×'+pos[2].toFixed(2);
 	// temporary event bus mechanism. It uses Vue, but it would be ideal to divorce vue from this gl code.
 	bus.$emit('crosshair-pos-change', posString);
