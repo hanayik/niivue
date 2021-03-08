@@ -75,11 +75,38 @@ export function mouseMove(x, y) {
 	drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
 } // mouseMove()
 
+function sph2cartDeg(azimuth, elevation) {
+//convert spherical AZIMUTH,ELEVATION,RANGE to Cartesion
+//see Matlab's [x,y,z] = sph2cart(THETA,PHI,R)
+// reverse with cart2sph
+ let Phi = -elevation * (Math.PI/180);
+ console.log(Phi);
+ let Theta = ((azimuth-90) % 360) * (Math.PI/180);
+ let ret = [Math.cos(Phi)* Math.cos(Theta), Math.cos(Phi) * Math.sin(Theta), Math.sin(Phi) ];
+ let len = Math.sqrt(ret[0] * ret[0] + ret[1] * ret[1] + ret[2] * ret[2] );
+ if (len <= 0.0) return ret;
+ ret[0] /= len;
+ ret[1] /= len;
+ ret[2] /= len;
+ return ret;
+} // sph2cartDeg()
+
+export function clipPlaneUpdate(azimuthElevationDepth) {
+	// azimuthElevationDepth is 3 component vector [a, e, d]
+	//  azimuth: camera position in degrees around object, typically 0..360 (or -180..+180)
+	//  elevation: camera height in degrees, range -90..90
+	//  depth: distance of clip plane from center of volume, range 0..~1.73 (e.g. 2.0 for no clip plane)
+	if (sliceType != sliceTypeRender) return;
+	let v = sph2cartDeg(azimuthElevationDepth[0], azimuthElevationDepth[1]);
+	clipPlane = [v[0], v[1], v[2], azimuthElevationDepth[2]];
+	drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
+} // clipPlaneUpdate()
+ 
 export function clipPlaneMove(newPlane) {
 	if (sliceType != sliceTypeRender) return;
   clipPlane = newPlane
 	drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
-} // clipPlaneMove
+} // clipPlaneMove()
 
 export function setCrosshairColor(color) {
   crosshairColor = color
@@ -213,12 +240,12 @@ function reorient(hdr) {
 // not elegant, as JavaScript arrays are always 1D
 	let a = hdr.affine;
 	let absR = mat.mat3.fromValues(Math.abs(a[0][0]),Math.abs(a[0][1]),Math.abs(a[0][2]), Math.abs(a[1][0]),Math.abs(a[1][1]),Math.abs(a[1][2]), Math.abs(a[2][0]),Math.abs(a[2][1]),Math.abs(a[2][2]));
-	//mat.mat3.transpose(A,A);
-	//first column = x
+	//1st column = x
 	let ixyz = [1, 1, 1];
     if (absR[3] > absR[0]) ixyz[0] = 2;//(absR[1][0] > absR[0][0]) ixyz[0] = 2;
     if ((absR[6] > absR[0]) && (absR[6]> absR[3])) ixyz[0] = 3;//((absR[2][0] > absR[0][0]) && (absR[2][0]> absR[1][0])) ixyz[0] = 3;
-    ixyz[1] = 1;
+	//2nd column = y
+	ixyz[1] = 1;
     if (ixyz[0] === 1) {
 		if (absR[4] > absR[7]) //(absR[1][1] > absR[2][1])
 			ixyz[1] = 2
@@ -235,7 +262,7 @@ function reorient(hdr) {
        else
            ixyz[1] = 2;
     }
-    //third column = z: constrained as x+y+z = 1+2+3 = 6
+    //3rd column = z: constrained as x+y+z = 1+2+3 = 6
     ixyz[2] = 6 - ixyz[1] - ixyz[0];
 	let perm = [1,2,3];
     perm[ixyz[0]-1] = 1;
@@ -275,7 +302,6 @@ function reorientVolume(hdr, img) {
 	//lots of room for speed/memory opitmization, e.g. LAS -> RAS all in plane
 	let {perm, residualR, requiresRot} = reorient(hdr);
 	if (!requiresRot) return; //already rotated
-	console.log("FLIP!");
 	var imgRaw = null
 	if (hdr.datatypeCode === 2) //data already uint8
 		imgRaw = new Uint8Array(img);
@@ -309,6 +335,7 @@ function reorientVolume(hdr, img) {
 			} //for x
 		} //for y
 	} //for z
+	//update header to show new dimensions and rotated affine matrix. ToDo: qform now wrong!
 	hdr.dims[1] = outdim[0];
 	hdr.dims[2] = outdim[1];
 	hdr.dims[3] = outdim[2];
@@ -489,7 +516,7 @@ export function updateGLVolume(gl, overlayItem) { //load volume or change contra
 	gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
 	gl.texStorage3D(gl.TEXTURE_3D, 4, gl.RGBA8, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
 	gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], gl.RGBA, gl.UNSIGNED_BYTE, imgRGBA8);
-	drawSlices(gl, overlayItem)
+	drawSlices(gl, overlayItem);
 } // updateVolume()
 
 export function selectColormap(gl, lutName = "") {
@@ -606,7 +633,6 @@ export function mouseMPScroll(scrollVal, x, y) {
 		} //if click in slice i
 	} //for i: each slice on screen
 } // mouseMPScroll()
-
 
 export function mouseClick(gl, overlayItem, x, y) {
 	if (sliceType === sliceTypeRender)
@@ -814,9 +840,32 @@ function draw3D(gl, overlayItem) {
 	return posString;
 } // draw3D()
 
-function frac2mm(overlayItem) {
-	//compute crosshair in mm, not fractions:
-	let pos = mat.vec4.fromValues(crosshairPos[0],crosshairPos[1],crosshairPos[2],1);
+export function mm2frac(overlayItem, mm) {
+	//given mm, return volume fraction
+	//convert from object space in millimeters to normalized texture space XYZ= [0..1, 0..1 ,0..1]
+	let mm4 = mat.vec4.fromValues( mm[0], mm[1], mm[2],1);
+	let d = overlayItem.volume.hdr.dims;
+	let frac = [0, 0, 0];
+	if ((d[1] < 1) || (d[2] < 1) || (d[3] < 1)) 
+		return frac;
+	let sf = overlayItem.volume.hdr.affine;
+	let sform = mat.mat4.fromValues(
+		sf[0][0], sf[1][0], sf[2][0], sf[3][0],
+		sf[0][1], sf[1][1], sf[2][1], sf[3][1],
+		sf[0][2], sf[1][2], sf[2][2], sf[3][2],
+		sf[0][3], sf[1][3], sf[2][3], sf[3][3]);
+	mat.mat4.invert(sform, sform);
+	mat.vec4.transformMat4(mm4, mm4, sform);
+	frac[0] = (mm4[0] + 0.5) / d[1];
+	frac[1] = (mm4[1] + 0.5) / d[2];
+	frac[2] = (mm4[2] + 0.5) / d[3];
+	//console.log("mm", mm, " -> frac", frac);
+	return frac;
+} // mm2frac()
+
+export function frac2mm(overlayItem, frac) {
+	//convert from normalized texture space XYZ= [0..1, 0..1 ,0..1] to object space in millimeters
+	let pos = mat.vec4.fromValues(frac[0], frac[1], frac[2], 1);
 	let d = overlayItem.volume.hdr.dims;
 	let dim = mat.vec4.fromValues(d[1], d[2], d[3], 1);
 	let sf = overlayItem.volume.hdr.affine;
@@ -879,7 +928,7 @@ export function drawSlices(gl, overlayItem) {
 		// drawTextBelow(gl, [ltwh[0]+ wX + (wY * 0.5), ltwh[1] + hZ + margin + hY * colorbarHeight], "Syzygy"); //DEMO
 	}
 	gl.finish();
-	let pos = frac2mm(overlayItem);
+	let pos = frac2mm(overlayItem, [crosshairPos[0],crosshairPos[1],crosshairPos[2]]);
 	let posString = pos[0].toFixed(2)+'×'+pos[1].toFixed(2)+'×'+pos[2].toFixed(2);
 	// temporary event bus mechanism. It uses Vue, but it would be ideal to divorce vue from this gl code.
 	bus.$emit('crosshair-pos-change', posString);
