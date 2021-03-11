@@ -45,7 +45,7 @@ export default {
     });
 
     bus.$on('set-clip-planes', function (newPlanes) {
-      nv.clipPlaneMove(newPlanes)
+      nv.clipPlaneUpdate(newPlanes)
     });
 
 

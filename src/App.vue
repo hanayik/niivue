@@ -57,49 +57,37 @@
           </v-row>
           <v-row v-if="viewShown3D == true">
             <v-slider
-                v-model="clipValX"
-                step="0.005"
-                max="1"
-                min="-1"
+                v-model="clipValAz"
+                step="1"
+                max="360"
+                min="0"
                 thumb-label
                 @input="onClipPlaneChange"
-                label="clip x"
+                label="clip Azimu"
               >
             </v-slider>
           </v-row>
           <v-row v-if="viewShown3D == true">
             <v-slider
-                v-model="clipValY"
-                step="0.005"
-                max="1"
-                min="-1"
+                v-model="clipValEl"
+                step="1"
+                max="90"
+                min="-90"
                 thumb-label
                 @input="onClipPlaneChange"
-                label="clip y"
+                label="clip Eleva"
               >
             </v-slider>
           </v-row>
           <v-row v-if="viewShown3D == true">
             <v-slider
-                v-model="clipValZ"
-                step="0.005"
-                max="1"
-                min="-1"
-                thumb-label
-                @input="onClipPlaneChange"
-                label="clip z"
-              >
-            </v-slider>
-          </v-row>
-          <v-row v-if="viewShown3D == true">
-            <v-slider
-                v-model="clipValW"
+                v-model="clipValDepth"
                 step="0.005"
                 max="0.5"
-                min="-0.5"
+                min="0"
                 thumb-label
                 @input="onClipPlaneChange"
-                label="clip w"
+                label="clip Depth"
               >
             </v-slider>
           </v-row>
@@ -148,10 +136,9 @@ export default {
       tab: null,
       viewShown2D: false,
       viewShown3D: false,
-      clipValX: 0,
-      clipValY: 0,
-      clipValZ: 0,
-      clipValW: 0,
+      clipValAz: 0,
+      clipValEl: 0,
+      clipValDepth: 0.5,
       sliceScrollVal: 0.5,
       appTabs: ['Menu', 'Draw', 'Edit', 'Scripting'],
       coordinateString: '0x0x0',
@@ -204,18 +191,17 @@ export default {
 
     onClipPlaneChange: function() {
       if (this.viewShown3D){
-        bus.$emit('set-clip-planes', [this.clipValX, this.clipValY, this.clipValZ, this.clipValW]);
+        bus.$emit('set-clip-planes', [this.clipValAz, this.clipValEl, this.clipValDepth]);
 
       }           
     },
 
     onResetClipPlane: function() {
       if (this.viewShown3D){
-        this.clipValX = 0
-        this.clipValY = 0
-        this.clipValZ = 0
-        this.clipValW = 0
-        bus.$emit('set-clip-planes', [this.clipValX, this.clipValY, this.clipValZ, this.clipValW]);
+        this.clipValAz = 0
+        this.clipValEl = 0
+        this.clipValDepth = 2
+        bus.$emit('set-clip-planes', [this.clipValAz, this.clipValEl, this.clipValDepth]);
 
       }           
     }
