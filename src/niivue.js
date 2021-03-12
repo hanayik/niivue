@@ -9,6 +9,102 @@ import { vertFontShader, fragFontShader } from "./shader-srcs.js";
 
 import {bus} from "@/bus.js"
 
+export let Niivue = function(opts){
+  this.opts = {} // will be populate with opts or defaults when a new Niivue object instance is created
+  this.defaults = {
+    textHeight: 0.03,  // 0 for no text, fraction of canvas height
+    colorbarHeight: 0.05, // 0 for no colorbars, fraction of Nifti j dimension
+    crosshairWidth: 1, // 0 for no crosshairs
+    backColor: [0, 0, 0, 1],
+    crosshairColor: [1, 0, 0 ,1],
+    colorBarMargin: 0.05 // x axis margin arount color bar, clip space coordinates
+
+  }
+
+  this.colormapTexture = null
+  this.volumeTexture = null
+  this.overlayTexture = null
+  this.sliceShader = null
+  this.lineShader = null
+  this.renderShader = null
+  this.colorbarShader = null
+  this.fontShader = null
+  this.fontMets = null
+
+  this.sliceTypeAxial = 0
+  this.sliceTypeCoronal = 1
+  this.sliceTypeSagittal = 2
+  this.sliceTypeMultiplanar = 3
+  this.sliceTypeRender = 4
+  this.sliceType = sliceTypeMultiplanar // sets current view in webgl canvas
+  this.scene = {}
+  this.scene.renderAzimuth = 120
+  this.scene.renderElevation = 15
+  this.scene.crosshairPos = [0.5, 0.5, 0.5]
+  this.scene.clipPlane = [0, 0, 0, 0]
+  this.overlays = []
+  this.isRadiologicalConvention = false
+  this.volScaleMultiplier = 1
+  this.mousePos = [0, 0]
+  this.numScreenSlices = 0 // e.g. for multiplanar view, 3 simultaneous slices: axial, coronal, sagittal
+  this.screenSlices = [ //location and type of each 2D slice on screen, allows clicking to detect position
+  {leftTopWidthHeight: [1, 0, 0, 1], axCorSag: this.sliceTypeAxial},
+  {leftTopWidthHeight: [1, 0, 0, 1], axCorSag: this.sliceTypeAxial},
+  {leftTopWidthHeight: [1, 0, 0, 1], axCorSag: this.sliceTypeAxial},
+  {leftTopWidthHeight: [1, 0, 0, 1], axCorSag: this.sliceTypeAxial}
+];
+  this.sliceOpacity = 1.0
+
+  // loop through known Niivue properties
+  // if the user supplied opts object has a
+  // property listed in the known properties, then set
+  // Niivue.opts.<prop> to that value, else apply defaults.
+  for (let prop in this.defaults) {
+    this.opts[prop] = (opts[prop] === undefined) ? this.defaults[prop] : opts[prop]
+  }
+}
+
+// test if two arrays have equal values for each element
+Niivue.prototype.arrayEquals = function(a, b) {
+  return Array.isArray(a) &&
+    Array.isArray(b) &&
+    a.length === b.length &&
+    a.every((val, index) => val === b[index]);
+}
+
+// update mouse position from new mouse down coordinates
+Niivue.prototype.mouseDown = function mouseDown(x, y) {
+  if (this.sliceType != this.sliceTypeRender) return;
+	this.mousePos = [x,y];
+} // mouseDown()
+
+Niivue.prototype.mouseMove = function mouseMove(x, y) {
+	if (this.sliceType != this.sliceTypeRender) return;
+	this.scene.renderAzimuth += x - this.mousePos[0];
+	this.scene.renderElevation += y - this.mousePos[1];
+	this.mousePos = [x,y];
+	this.drawScene() // TODO: change drawSlices to drawScene
+} // mouseMove()
+
+Niivue.prototype.sph2cartDeg = function sph2cartDeg(azimuth, elevation) {
+//convert spherical AZIMUTH,ELEVATION,RANGE to Cartesion
+//see Matlab's [x,y,z] = sph2cart(THETA,PHI,R)
+// reverse with cart2sph
+ let Phi = -elevation * (Math.PI/180);
+ let Theta = ((azimuth-90) % 360) * (Math.PI/180);
+ let ret = [Math.cos(Phi)* Math.cos(Theta), Math.cos(Phi) * Math.sin(Theta), Math.sin(Phi) ];
+ let len = Math.sqrt(ret[0] * ret[0] + ret[1] * ret[1] + ret[2] * ret[2] );
+ if (len <= 0.0) return ret;
+ ret[0] /= len;
+ ret[1] /= len;
+ ret[2] /= len;
+ return ret;
+} // sph2cartDeg()
+
+
+
+
+
 export var textHeight = 0.03; //0 for no text, fraction of canvas height
 export var colorbarHeight = 0.05; //0 for no colorbars, fraction of NIfTI j dimension
 export var crosshairWidth = 1; //0 for no crosshairs, pixels
@@ -101,7 +197,7 @@ export function clipPlaneUpdate(azimuthElevationDepth) {
 	clipPlane = [v[0], v[1], v[2], azimuthElevationDepth[2]];
 	drawSlices(getGL(), _overlayItem) //_overlayItem is local to niivue.js and is set in loadVolume()
 } // clipPlaneUpdate()
- 
+
 export function clipPlaneMove(newPlane) {
 	if (sliceType != sliceTypeRender) return;
   clipPlane = newPlane
@@ -846,7 +942,7 @@ export function mm2frac(overlayItem, mm) {
 	let mm4 = mat.vec4.fromValues( mm[0], mm[1], mm[2],1);
 	let d = overlayItem.volume.hdr.dims;
 	let frac = [0, 0, 0];
-	if ((d[1] < 1) || (d[2] < 1) || (d[3] < 1)) 
+	if ((d[1] < 1) || (d[2] < 1) || (d[3] < 1))
 		return frac;
 	let sf = overlayItem.volume.hdr.affine;
 	let sform = mat.mat4.fromValues(
@@ -925,7 +1021,7 @@ export function drawSlices(gl, overlayItem) {
 			draw2D(gl, [ltwh3x1[0] + wX1,ltwh3x1[1], wX1, hZ1], 1);
 			//draw sagittal
 			draw2D(gl, [ltwh3x1[0] + wX1 + wX1,ltwh3x1[1], hY1, hZ1], 2);
-					
+
 		} else {
 			let wY = ltwh[2] - wX;
 			let hY = ltwh[3] * volScale[1]/(volScale[1]+volScale[2]);

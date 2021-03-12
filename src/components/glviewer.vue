@@ -25,6 +25,9 @@ import * as Hammer from 'hammerjs';
 import * as nv from "../niivue.js";
 import {bus} from "@/bus.js"
 
+let niivue = new nv.Niivue({textHeight: 1.0})
+console.log(niivue)
+
 export default {
   name: "glviewer",
   /*
