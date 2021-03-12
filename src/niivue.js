@@ -913,19 +913,34 @@ export function drawSlices(gl, overlayItem) {
 	} else { //sliceTypeMultiplanar
 		let ltwh = scaleSlice(gl, volScale[0]+volScale[1], volScale[1]+volScale[2]);
 		let wX = ltwh[2] * volScale[0]/(volScale[0]+volScale[1]);
-		let wY = ltwh[2] - wX;
-		let hY = ltwh[3] * volScale[1]/(volScale[1]+volScale[2]);
-		let hZ = ltwh[3] - hY;
-		//draw axial
-		draw2D(gl, [ltwh[0],ltwh[1]+hZ, wX, hY], 0);
-		//draw coronal
-		draw2D(gl, [ltwh[0],ltwh[1], wX, hZ], 1);
-		//draw sagittal
-		draw2D(gl, [ltwh[0]+wX,ltwh[1], wY, hZ], 2);
-		//draw colorbar (optional)
-		var margin = colorBarMargin * hY;
-		drawColorbar(gl, [ltwh[0]+wX+margin, ltwh[1] + hZ + margin, wY - margin - margin, hY * colorbarHeight]);
-		// drawTextBelow(gl, [ltwh[0]+ wX + (wY * 0.5), ltwh[1] + hZ + margin + hY * colorbarHeight], "Syzygy"); //DEMO
+		let ltwh3x1 = scaleSlice(gl, volScale[0]+volScale[0]+volScale[1], Math.max(volScale[1],volScale[2]));
+		let wX1 = ltwh3x1[2] * volScale[0]/(volScale[0]+volScale[0]+volScale[1]);
+		if (wX1 > wX) {
+			let pixScale = (wX1 / volScale[0]);
+			let hY1 = volScale[1] * pixScale;
+			let hZ1 = volScale[2] * pixScale;
+			//draw axial
+			draw2D(gl, [ltwh3x1[0],ltwh3x1[1], wX1, hY1], 0);
+			//draw coronal
+			draw2D(gl, [ltwh3x1[0] + wX1,ltwh3x1[1], wX1, hZ1], 1);
+			//draw sagittal
+			draw2D(gl, [ltwh3x1[0] + wX1 + wX1,ltwh3x1[1], hY1, hZ1], 2);
+					
+		} else {
+			let wY = ltwh[2] - wX;
+			let hY = ltwh[3] * volScale[1]/(volScale[1]+volScale[2]);
+			let hZ = ltwh[3] - hY;
+			//draw axial
+			draw2D(gl, [ltwh[0],ltwh[1]+hZ, wX, hY], 0);
+			//draw coronal
+			draw2D(gl, [ltwh[0],ltwh[1], wX, hZ], 1);
+			//draw sagittal
+			draw2D(gl, [ltwh[0]+wX,ltwh[1], wY, hZ], 2);
+			//draw colorbar (optional)
+			var margin = colorBarMargin * hY;
+			drawColorbar(gl, [ltwh[0]+wX+margin, ltwh[1] + hZ + margin, wY - margin - margin, hY * colorbarHeight]);
+			// drawTextBelow(gl, [ltwh[0]+ wX + (wY * 0.5), ltwh[1] + hZ + margin + hY * colorbarHeight], "Syzygy"); //DEMO
+		}
 	}
 	gl.finish();
 	let pos = frac2mm(overlayItem, [crosshairPos[0],crosshairPos[1],crosshairPos[2]]);
