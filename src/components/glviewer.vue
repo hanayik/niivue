@@ -25,8 +25,6 @@ import * as Hammer from 'hammerjs';
 import * as nv from "../niivue.js";
 import {bus} from "@/bus.js"
 
-let niivue = new nv.Niivue({textHeight: 1.0})
-console.log(niivue)
 
 export default {
   name: "glviewer",
@@ -39,24 +37,14 @@ export default {
     shader: String,
   },
   created () {
-    bus.$on('slice-type-change', function (sliceType) {
-      nv.setSliceType(sliceType)
-    });
-
-    bus.$on('set-2D-slice', function (slicePosVal) {
-      nv.sliceScroll2D(slicePosVal, null, null, false) // x,y = null
-    });
-
-    bus.$on('set-clip-planes', function (newPlanes) {
-      nv.clipPlaneUpdate(newPlanes)
-    });
-
+    
 
 
   },
   
   data() {
     return {
+      niivue: null,
       selectedOverlay: 0,
       last2DSliceVal: 0.5,
       mouseDown: false,
@@ -99,12 +87,12 @@ export default {
         viewer.style.height = document.documentElement.clientHeight - bottomStatusBarHeight
         canvas.height = document.documentElement.clientHeight - bottomStatusBarHeight
       }
-      nv.drawSlices(this.gl, this.overlays[this.selectedOverlay])
+      this.niivue.drawSlices(this.gl, this.overlays[this.selectedOverlay])
     },
 
     onCrosshairColorChange: function() {
       var floatColor = [this.crosshairColor.r/255, this.crosshairColor.g/255, this.crosshairColor.b/255, this.crosshairColor.a]
-      nv.setCrosshairColor(floatColor)
+      this.niivue.setCrosshairColor(floatColor)
     }
 
   },
@@ -129,8 +117,8 @@ export default {
       this.dialog = false
       this.mouseDown = true
       var rect = canvas.getBoundingClientRect()
-      nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
-      nv.mouseDown(e.clientX - rect.left,e.clientY - rect.top)
+      this.niivue.mouseClick(this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
+      this.niivue.mouseDown(e.clientX - rect.left,e.clientY - rect.top)
     })
     
     gl.canvas.addEventListener('touchstart', (e) => {
@@ -138,7 +126,7 @@ export default {
       this.dialog = false
       this.touchDown = true
       var rect = canvas.getBoundingClientRect()
-      nv.mouseClick(this.gl, this.overlays[0], e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+      this.niivue.mouseClick(this.overlays[0], e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
       nv.mouseDown(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
     })
 
@@ -147,45 +135,45 @@ export default {
       if (this.mouseDown) {
         var rect = canvas.getBoundingClientRect()
         // mouseClick if any 2D mode
-        nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
+        this.niivue.mouseClick(this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
         // mouseMove if 3D render mode
-        nv.mouseMove(e.clientX - rect.left,e.clientY - rect.top)
+        this.niivue.mouseMove(e.clientX - rect.left,e.clientY - rect.top)
       }
     })
 
     gl.canvas.addEventListener('touchmove', (e) => {
       if (this.touchDown && e.touches.length < 2) {
         var rect = canvas.getBoundingClientRect()
-        nv.mouseClick(this.gl, this.overlays[0], e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
-        nv.mouseMove(e.touches[0].clientX - rect.left,e.touches[0].clientY - rect.top)
+        this.niivue.mouseClick(this.overlays[0], e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+        this.niivue.mouseMove(e.touches[0].clientX - rect.left,e.touches[0].clientY - rect.top)
       }
     })
 
 
     gc.on('pinchin', () => {
       // scroll 2D slices 
-      nv.sliceScroll2D(0.001, null, null)
+      this.niivue.sliceScroll2D(0.001, null, null)
     })
 
     gc.on('pinchout', () => {
       // scroll 2D slices 
-      nv.sliceScroll2D(-0.001, null, null)
+      this.niivue.sliceScroll2D(-0.001, null, null)
     })
 
     gl.canvas.addEventListener('wheel', (e) => {
       if (this.zDown) {
         e.preventDefault()
         this.scale += e.deltaY * -0.01
-        nv.setScale(this.scale)
+        this.niivue.setScale(this.scale)
       } else {
         // scroll 2D slices 
         e.preventDefault()
         e.stopPropagation()
         var rect = canvas.getBoundingClientRect()
         if (e.deltaY < 0){
-          nv.sliceScroll2D(-0.01, e.clientX - rect.left, e.clientY - rect.top)
+          this.niivue.sliceScroll2D(-0.01, e.clientX - rect.left, e.clientY - rect.top)
         } else {
-          nv.sliceScroll2D(0.01, e.clientX - rect.left, e.clientY - rect.top)
+          this.niivue.sliceScroll2D(0.01, e.clientX - rect.left, e.clientY - rect.top)
         }
         
       }
@@ -220,11 +208,11 @@ export default {
             }, 200)
           this.discoModeCrosshairTimer = setInterval(
             function () {
-              nv.setCrosshairColor([Math.random(), Math.random(), Math.random(), 1])
+              this.niivue.setCrosshairColor([Math.random(), Math.random(), Math.random(), 1])
             }, 200)
         } else {
           bus.$emit('colormap-change', "gray");
-          nv.setCrosshairColor([1, 0, 0, 1])
+          this.niivue.setCrosshairColor([1, 0, 0, 1])
 
         }
       }
@@ -238,18 +226,32 @@ export default {
     })
 
     window.addEventListener('resize', this.onWindowResize)
+
+    this.niivue = new nv.Niivue({}).attachTo('#gl')
+    console.log(this.niivue)
+
     this.gl = gl;
-    this.gl.enable(this.gl.CULL_FACE);
-    this.gl.cullFace(this.gl.FRONT);
-    this.gl.enable(this.gl.BLEND);
-    this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
-    nv.init(this.gl);
+    
+    //nv.init(this.gl);
     //this.overlays.forEach((overlay, i) =>  nv.loadVolume(overlay, i))
-    nv.loadVolume(this.overlays[this.selectedOverlay]); // just load first overlay. addtional overlays are not handled yet
+    this.niivue.loadVolumes(this.overlays); // pass in all overlays (an array)
     
     bus.$on('opacity-change', (opacity) => {
-      nv.setSliceOpacity(opacity)
+      this.niivue.setSliceOpacity(opacity)
     });
+
+    bus.$on('slice-type-change', function (sliceType) {
+      this.niivue.setSliceType(sliceType)
+    }.bind(this));
+
+    bus.$on('set-2D-slice', function (slicePosVal) {
+      this.niivue.sliceScroll2D(slicePosVal, null, null, false) // x,y = null
+    }.bind(this));
+
+    bus.$on('set-clip-planes', function (newPlanes) {
+      this.niivue.clipPlaneUpdate(newPlanes)
+    }.bind(this));
+
 
   },
 };
