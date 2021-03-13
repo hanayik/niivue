@@ -281,3 +281,90 @@ void main() {
     float opacity = clamp(screenPxDistance + 0.5, 0.0, 1.0);
 	color = vec4(fontColor.rgb , fontColor.a * opacity);
 }`;
+
+export var vertOrientShader =
+`#version 300 es
+#line 288
+precision highp int;
+precision highp float;
+in vec3 vPos;
+out vec2 TexCoord;
+void main() {
+    TexCoord = vPos.xy;
+    gl_Position = vec4( (vPos.xy-vec2(0.5,0.5))* 2.0, 0.0, 1.0);
+}`;
+
+export var fragOrientShaderU =
+`#version 300 es
+#line 300
+precision highp int;
+precision highp float;
+in vec2 TexCoord;
+out vec4 FragColor;
+uniform float coordZ;
+uniform float scl_slope;
+uniform float scl_inter;
+uniform float cal_max;
+uniform float cal_min;
+uniform highp usampler3D intensityVol;
+uniform highp sampler2D colormap;
+uniform mat4 mtx;
+void main(void) {
+ vec4 vx = vec4(TexCoord.xy, coordZ, 1.0);
+ vx *= mtx;
+ float f = (scl_slope * float(texture(intensityVol, vx.xyz).r)) + scl_inter;
+ float r = max(0.00001, abs(cal_max - cal_min));
+ float mn = min(cal_min, cal_max);
+ f = mix(0.0, 1.0, (f - mn) / r);
+ FragColor = texture(colormap, vec2(f, 0.5)).rgba;
+}`;
+
+export var fragOrientShaderI =
+`#version 300 es
+#line 325
+precision highp int;
+precision highp float;
+in vec2 TexCoord;
+out vec4 FragColor;
+uniform float coordZ;
+uniform float scl_slope;
+uniform float scl_inter;
+uniform float cal_max;
+uniform float cal_min;
+uniform highp isampler3D intensityVol;
+uniform highp sampler2D colormap;
+uniform mat4 mtx;
+void main(void) {
+ vec4 vx = vec4(TexCoord.xy, coordZ, 1.0);
+ vx *= mtx;
+ float f = (scl_slope * float(texture(intensityVol, vx.xyz).r)) + scl_inter;
+ float r = max(0.00001, abs(cal_max - cal_min));
+ float mn = min(cal_min, cal_max);
+ f = mix(0.0, 1.0, (f - mn) / r);
+ FragColor = texture(colormap, vec2(f, 0.5)).rgba;
+}`;
+
+export var fragOrientShaderF =
+`#version 300 es
+#line 350
+precision highp int;
+precision highp float;
+in vec2 TexCoord;
+out vec4 FragColor;
+uniform float coordZ;
+uniform float scl_slope;
+uniform float scl_inter;
+uniform float cal_max;
+uniform float cal_min;
+uniform highp sampler3D intensityVol;
+uniform highp sampler2D colormap;
+uniform mat4 mtx;
+void main(void) {
+ vec4 vx = vec4(TexCoord.xy, coordZ, 1.0);
+ vx *= mtx;
+ float f = (scl_slope * float(texture(intensityVol, vx.xyz).r)) + scl_inter;
+ float r = max(0.00001, abs(cal_max - cal_min));
+ float mn = min(cal_min, cal_max);
+ f = mix(0.0, 1.0, (f - mn) / r);
+ FragColor = texture(colormap, vec2(f, 0.5)).rgba;
+}`;

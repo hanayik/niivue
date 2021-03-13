@@ -144,7 +144,7 @@ export default {
       coordinateString: '0x0x0',
       overlayList: [
         {
-          volumeURL: "./spm152.nii.gz",
+          volumeURL: "./UINT8.nii.gz", //"./spm152.nii.gz",
           volume: {hdr: null, img: null},
           name: "standard",
           intensityMin: 0,

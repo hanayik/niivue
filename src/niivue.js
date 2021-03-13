@@ -6,6 +6,7 @@ import { vertLineShader, fragLineShader } from "./shader-srcs.js";
 import { vertRenderShader, fragRenderShader } from "./shader-srcs.js";
 import { vertColorbarShader, fragColorbarShader } from "./shader-srcs.js";
 import { vertFontShader, fragFontShader } from "./shader-srcs.js";
+import { vertOrientShader, fragOrientShaderU, fragOrientShaderI, fragOrientShaderF, } from "./shader-srcs.js";
 
 import {bus} from "@/bus.js"
 
@@ -25,15 +26,17 @@ export var crosshairPos = [0.5, 0.5, 0.5];
 export var overlays = 1; //number of loaded overlays _DEMO_: 0
 export var clipPlane = [0, 0, 0, 0]; //x,y,z and depth of clip plane _DEMO_: [0.5, 0.5, 0.0, 2.0]
 export var isRadiologicalConvention = false;
-
 var crosshairColor =  [1, 0, 0, 1];
 var volScaleMultiplier = 1;
 var _overlayItem = null
 var colorBarMargin = 0.05
-
 var colormapTexture = null
+var overlayColormapTexture = null
 var volumeTexture = null
 var overlayTexture = null
+var orientShaderU = null
+var orientShaderI = null
+var orientShaderF = null
 var sliceShader = null //program for 2D slice views
 var lineShader = null //program for cross-hairs
 var renderShader = null //program for 3D views
@@ -156,16 +159,28 @@ export function getGL() {
 	return gl;
 } // getGL()
 
-function scaleTo8Bit(A, overlayItem) {
+function scaleTo8Bit(overlayItem) { //ToDo: replace with compute shader
 	var volume = overlayItem.volume
+	var hdr = overlayItem.volume.hdr
+	var img = overlayItem.volume.img
 	var mn = volume.hdr.cal_min;
 	var mx = volume.hdr.cal_max;
+	let A = null
+	if (hdr.datatypeCode === 2) //data already uint8
+		A = new Uint8Array(img);
+	else if (hdr.datatypeCode === 4)
+		A = new Int16Array(img);
+	else if (hdr.datatypeCode === 16)
+		A = new Float32Array(img);
+	else if (hdr.datatypeCode === 64)
+		A = new Float64Array(img);
+	else if (hdr.datatypeCode === 512)
+		A = new Uint16Array(img);
 	var vox = A.length
 	var img8 = new Uint8ClampedArray(vox);
 	var scale = 1;
-	var i
 	if (mx > mn) scale = 255 / (mx - mn);
-	for (i = 0; i < (vox - 1); i++) {
+	for (let i = 0; i < (vox - 1); i++) {
 		var v = A[i];
 		v = (v * volume.hdr.scl_slope) + volume.hdr.scl_inter;
 		img8[i] = (v - mn) * scale;
@@ -173,65 +188,44 @@ function scaleTo8Bit(A, overlayItem) {
 	return img8 // return scaled
 } // scaleTo8Bit()
 
-function overlayRGBA(overlayItem) {
-	let hdr = overlayItem.volume.hdr;
-	let vox = hdr.dims[1] * hdr.dims[2] * hdr.dims[3];
-	let imgRGBA = new Uint8ClampedArray(vox * 4);
-	let radius = 0.2 * Math.min(Math.min(hdr.dims[1], hdr.dims[2]), hdr.dims[3]);
-	let halfX = 0.5 * hdr.dims[1];
-	let halfY = 0.5 * hdr.dims[2];
-	let halfZ = 0.5 * hdr.dims[3];
-	let j = 0;
-	for (let z = 0; z < hdr.dims[3]; z++) {
-		for (let y = 0; y < hdr.dims[2]; y++) {
-			for (let x = 0; x < hdr.dims[1]; x++) {
-				let dx = (Math.abs(x - halfX));
-				let dy = (Math.abs(y - halfY));
-				let dz = (Math.abs(z - halfZ));
-				let dist = Math.sqrt(dx*dx + dy*dy + dz * dz);
-				let v = 0;
-				if (dist < radius) v = 255;
-				imgRGBA[j] = 0; //Red
-				j++;
-				imgRGBA[j] = v; //Green
-				j++;
-				imgRGBA[j] = 0; //Blue
-				j++;
-				imgRGBA[j] = v * 0.5; //Alpha
-				j++;
-			}
-		}
-	}
-	return imgRGBA;
-} // overlayRGBA()
-
-export function calibrateIntensity(A, overlayItem) {
-  var volume = overlayItem.volume
-  var vox = A.length;
+export function calibrateIntensity(overlayItem) { //ToDo: replace with compute shader
+	var hdr = overlayItem.volume.hdr
+	var img = overlayItem.volume.img
+	let A = null
+	if (hdr.datatypeCode === 2) //data already uint8
+		A = new Uint8Array(img);
+	else if (hdr.datatypeCode === 4)
+		A = new Int16Array(img);
+	else if (hdr.datatypeCode === 16)
+		A = new Float32Array(img);
+	else if (hdr.datatypeCode === 64)
+		A = new Float64Array(img);
+	else if (hdr.datatypeCode === 512)
+		A = new Uint16Array(img);
+	var vox = A.length;
 	var mn = Infinity;
 	var mx = -Infinity;
-	var i
-	for (i = 0; i < (vox - 1); i++) {
+	for (let i = 0; i < (vox - 1); i++) {
 		if (!isFinite(A[i])) continue;
 		if (A[i] < mn) mn = A[i];
 		if (A[i] > mx) mx = A[i];
 	}
 	//calibrate intensity
-	if ((isFinite(volume.hdr.scl_slope)) && (isFinite(volume.hdr.scl_inter)) && (volume.hdr.scl_slope !== 0.0)) {
+	if ((isFinite(hdr.scl_slope)) && (isFinite(hdr.scl_inter)) && (hdr.scl_slope !== 0.0)) {
 		//console.log(">> mn %f mx %f %f %f", mn, mx, hdr.scl_slope, hdr.scl_inter);
-		mn = (mn * volume.hdr.scl_slope) + volume.hdr.scl_inter;
-		mx = (mx * volume.hdr.scl_slope) + volume.hdr.scl_inter;
+		mn = (mn * hdr.scl_slope) + hdr.scl_inter;
+		mx = (mx * hdr.scl_slope) + hdr.scl_inter;
 	} else {
-		volume.hdr.scl_slope = 1.0;
-		volume.hdr.scl_inter = 0.0;
+		hdr.scl_slope = 1.0;
+		hdr.scl_inter = 0.0;
 	}
 	//console.log("vx %d type %d mn %f mx %f", vox, hdr.datatypeCode, mn, mx);
 	//console.log("cal mn..mx %f..%f", hdr.cal_min, hdr.cal_max);
-	volume.hdr.global_min = mn;
-	volume.hdr.global_max = mx;
-	if ((!isFinite(volume.hdr.cal_min)) || (!isFinite(volume.hdr.cal_max)) || (volume.hdr.cal_min >= volume.hdr.cal_max)) {
-		volume.hdr.cal_min = mn;
-		volume.hdr.cal_max = mx;
+	hdr.global_min = mn;
+	hdr.global_max = mx;
+	if ((!isFinite(hdr.cal_min)) || (!isFinite(hdr.cal_max)) || (hdr.cal_min >= hdr.cal_max)) {
+		hdr.cal_min = mn;
+		hdr.cal_max = mx;
 	}
 } // calibrateIntensity()
 
@@ -297,7 +291,7 @@ function reorient(hdr) {
     return {perm, residualR, requiresRot};
 } // reorient()
 
-function reorientVolume(hdr, img) {
+function reorientVolume(hdr, img) { //ToDo: replace with compute shader
 	//rotate 3D volume to match approximately match RAS
 	//lots of room for speed/memory opitmization, e.g. LAS -> RAS all in plane
 	let {perm, residualR, requiresRot} = reorient(hdr);
@@ -309,8 +303,11 @@ function reorientVolume(hdr, img) {
 		imgRaw = new Int16Array(img);
 	else if (hdr.datatypeCode === 16)
 		imgRaw = new Float32Array(img);
+	else if (hdr.datatypeCode === 64)
+		imgRaw = new Float64Array(img);
 	else if (hdr.datatypeCode === 512)
 		imgRaw = new Uint16Array(img);
+	console.log('rotate ', perm);
 	let aperm = [Math.abs(perm[0]), Math.abs(perm[1]), Math.abs(perm[2])];
 	let outdim = [hdr.dims[aperm[0]], hdr.dims[aperm[1]], hdr.dims[aperm[2]] ];
 	let inRaw = [...imgRaw];
@@ -367,7 +364,10 @@ export function loadVolume(overlayItem) {
 			} else {
 				img = nii.readImage(hdr, dataBuffer);
 			}
+			let time = new Date();
 			reorientVolume(hdr, img);
+			time = new Date() - time;
+			console.log(time + " ms to rotate (CPU)");
 		} else {
 			alert("Unable to load buffer properly from volume?");
 			console.log("no buffer?");
@@ -462,8 +462,87 @@ export async function init(gl) {
 	fontShader = new Shader(gl, vertFontShader, fragFontShader);
 	fontShader.use(gl);
 	gl.uniform1i(fontShader.uniforms["fontTexture"], 3);
+	orientShaderU = new Shader(gl, vertOrientShader, fragOrientShaderU);
+	orientShaderI = new Shader(gl, vertOrientShader, fragOrientShaderI);
+	orientShaderF = new Shader(gl, vertOrientShader, fragOrientShaderF);
 	await initText(gl);
 } // init()
+
+function reorientVolumeGPU(gl, overlayItem) { //isGPU
+	// * eslint-disable no-unused-vars */
+	let time = new Date();
+	var hdr = overlayItem.volume.hdr
+	var img = overlayItem.volume.img
+	var fb = gl.createFramebuffer();
+	gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+	gl.disable(gl.CULL_FACE);
+	gl.viewport(0, 0, hdr.dims[1], hdr.dims[2]);
+	gl.disable(gl.BLEND);
+	let tempTex3D = gl.createTexture();
+	gl.activeTexture(gl.TEXTURE6); //Temporary Texture
+	gl.bindTexture(gl.TEXTURE_3D, tempTex3D);
+	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+	gl.pixelStorei( gl.UNPACK_ALIGNMENT, 1 )
+	//gl.texStorage3D(gl.TEXTURE_3D, 1, gl.RGBA8, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
+	//https://webgl2fundamentals.org/webgl/lessons/webgl-data-textures.html
+	//https://www.khronos.org/registry/OpenGL-Refpages/es3.0/html/glTexStorage3D.xhtml
+	let orientShader = orientShaderU;
+	if (hdr.datatypeCode === 2) {//data already uint8}
+		let imgRaw = new Uint8Array(img);
+		gl.texStorage3D(gl.TEXTURE_3D, 6, gl.R8UI, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
+		gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], gl.RED_INTEGER, gl.UNSIGNED_BYTE, imgRaw);
+	} else if (hdr.datatypeCode === 4) {
+		let imgRaw = new Int16Array(img);
+		gl.texStorage3D(gl.TEXTURE_3D, 6, gl.R16I, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
+		gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], gl.RED_INTEGER, gl.SHORT, imgRaw);
+		orientShader = orientShaderI;	
+	} else if (hdr.datatypeCode === 16) {
+		let imgRaw = new Float32Array(img);
+		gl.texStorage3D(gl.TEXTURE_3D, 6, gl.R32F, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
+		gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], gl.RED, gl.FLOAT, imgRaw);		
+		orientShader = orientShaderF;
+	} else if (hdr.datatypeCode === 64) {
+		let imgRaw = new Float64Array(img)
+		let img32f = new Float32Array;
+		img32f = Float32Array.from(imgRaw);
+		gl.texStorage3D(gl.TEXTURE_3D, 6, gl.R32F, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
+		gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], gl.RED, gl.FLOAT, img32f);		
+		orientShader = orientShaderF;
+	} else if (hdr.datatypeCode === 512) {
+		let imgRaw = new Uint16Array(img);
+		gl.texStorage3D(gl.TEXTURE_3D, 6, gl.R16UI, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
+		gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], gl.RED_INTEGER, gl.UNSIGNED_SHORT, imgRaw);	
+	}
+	orientShader.use(gl);
+	selectColormap(gl, "Winter", false) 
+	gl.bindTexture(gl.TEXTURE_3D, tempTex3D);
+	gl.uniform1i(orientShader.uniforms["intensityVol"], 6);
+	gl.uniform1i(orientShader.uniforms["colormap"], 7);
+	gl.uniform1f(orientShader.uniforms["scl_inter"], hdr.scl_inter);
+	gl.uniform1f(orientShader.uniforms["scl_slope"],hdr.scl_slope);
+	gl.uniform1f(orientShader.uniforms["cal_min"], 70);
+	gl.uniform1f(orientShader.uniforms["cal_max"], 80);
+	//let mtx = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]; //identity matrix: no change
+	let mtx = [-1,0,0,1, 0,1,0,0, 0,0,1,0, 0,0,0,1]; //mirror reverse
+	gl.uniformMatrix4fv(orientShader.uniforms["mtx"], false, mtx)
+	for (let i = 0; i < (hdr.dims[3]); i++) {
+		var coordZ = 1/hdr.dims[3] * (i + 0.5);
+		gl.uniform1f(orientShader.uniforms["coordZ"], coordZ);
+		gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, overlayTexture, 0, i);
+		gl.clear(gl.DEPTH_BUFFER_BIT); //only for background and first overlay!
+		gl.drawArrays(gl.TRIANGLE_STRIP, 5, 4);
+	}
+	gl.deleteTexture(tempTex3D);
+	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+	gl.deleteFramebuffer(fb);
+	time = new Date() - time;
+	console.log(time + " ms to rotate (GPU)");
+	// * eslint-enable no-unused-vars */
+}
 
 export function updateGLVolume(gl, overlayItem) { //load volume or change contrast
 	var cubeStrip = [0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0];
@@ -475,19 +554,6 @@ export function updateGLVolume(gl, overlayItem) { //load volume or change contra
 	gl.enableVertexAttribArray(0);
 	gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
 	var hdr = overlayItem.volume.hdr
-	var img = overlayItem.volume.img
-	// var vox = hdr.dims[1] * hdr.dims[2] * hdr.dims[3];
-	var imgRaw = null
-	if (hdr.datatypeCode === 2) //data already uint8
-		imgRaw = new Uint8Array(img);
-	else if (hdr.datatypeCode === 4)
-		imgRaw = new Int16Array(img);
-	else if (hdr.datatypeCode === 16)
-		imgRaw = new Float32Array(img);
-	else if (hdr.datatypeCode === 512)
-		imgRaw = new Uint16Array(img);
-	calibrateIntensity(imgRaw, overlayItem)
-	var img8 = scaleTo8Bit(imgRaw, overlayItem)
 	if (volumeTexture)
 		gl.deleteTexture(volumeTexture);
 	volumeTexture = gl.createTexture();
@@ -499,10 +565,13 @@ export function updateGLVolume(gl, overlayItem) { //load volume or change contra
 	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 	gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
+	//gl.texStorage3D(gl.TEXTURE_3D, 1, gl.R8, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
+	calibrateIntensity(overlayItem)
+	var img8 = scaleTo8Bit(overlayItem)
 	gl.texStorage3D(gl.TEXTURE_3D, 1, gl.R8, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
 	gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], gl.RED, gl.UNSIGNED_BYTE, img8);
 	//overlay texture
-	let imgRGBA8 = overlayRGBA(overlayItem)
+	//let imgRGBA8 = overlayRGBA(overlayItem)
 	if (overlayTexture)
 		gl.deleteTexture(overlayTexture);
 	overlayTexture = gl.createTexture();
@@ -515,11 +584,12 @@ export function updateGLVolume(gl, overlayItem) { //load volume or change contra
 	gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 	gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
 	gl.texStorage3D(gl.TEXTURE_3D, 4, gl.RGBA8, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
-	gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], gl.RGBA, gl.UNSIGNED_BYTE, imgRGBA8);
+	//gl.texSubImage3D(gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], gl.RGBA, gl.UNSIGNED_BYTE, imgRGBA8);
+	reorientVolumeGPU(gl, overlayItem, overlayTexture);
 	drawSlices(gl, overlayItem);
 } // updateVolume()
 
-export function selectColormap(gl, lutName = "") {
+export function selectColormap(gl, lutName = "", isBackground = true) {
 	var lut = makeLut([0, 255], [0, 255], [0, 255], [0, 128], [0, 255]); //gray
 	if (lutName === "Winter")
 		lut = makeLut([0, 0, 0], [0, 128, 255], [255, 196, 128], [0, 64, 128], [0, 128, 255]); //winter
@@ -531,11 +601,19 @@ export function selectColormap(gl, lutName = "") {
 		lut = makeLut([68, 49, 53, 253], [1, 104, 183, 231], [84, 142, 121, 37], [0, 56, 80, 88], [0, 65, 192, 255]);//viridis
 	if (lutName === "Inferno")
 		lut = makeLut([0, 120, 237, 240], [0, 28, 105, 249], [4, 109, 37, 33], [0, 56, 80, 88], [0, 64, 192, 255]);//inferno
-	if (colormapTexture !== null)
-		gl.deleteTexture(colormapTexture);
-	colormapTexture = gl.createTexture();
-	gl.activeTexture(gl.TEXTURE1);
-	gl.bindTexture(gl.TEXTURE_2D, colormapTexture);
+	if (isBackground) {
+		if (colormapTexture !== null)
+			gl.deleteTexture(colormapTexture);
+		colormapTexture = gl.createTexture();
+		gl.activeTexture(gl.TEXTURE1);
+		gl.bindTexture(gl.TEXTURE_2D, colormapTexture);
+	} else {
+		if (overlayColormapTexture !== null)
+			gl.deleteTexture(overlayColormapTexture);
+		overlayColormapTexture = gl.createTexture();
+		gl.activeTexture(gl.TEXTURE7);
+		gl.bindTexture(gl.TEXTURE_2D, overlayColormapTexture);
+	}
 	gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, 256, 1);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
@@ -721,6 +799,7 @@ function drawText(gl, xy, str) { //to right of x, vertically centered on y
 	if (textHeight <= 0) return;
 	fontShader.use(gl);
 	let scale = (textHeight * gl.canvas.height);
+	gl.enable(gl.BLEND);
 	gl.uniform2f(fontShader.uniforms["canvasWidthHeight"], gl.canvas.width, gl.canvas.height);
 	gl.uniform4fv(fontShader.uniforms["fontColor"], crosshairColor);
 	let screenPxRange = scale / fontMets.size * fontMets.distanceRange;
