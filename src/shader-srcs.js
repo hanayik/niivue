@@ -18,7 +18,6 @@ uniform vec3 rayDir;
 uniform vec3 texVox;
 uniform vec4 clipPlane;
 uniform highp sampler3D volume, overlay;
-uniform highp sampler2D colormap;
 uniform float overlays;
 in vec3 vColor;
 out vec4 fColor;
@@ -89,11 +88,10 @@ void main() {
     float ran = fract(sin(gl_FragCoord.x * 12.9898 + gl_FragCoord.y * 78.233) * 43758.5453);
     samplePos += deltaDir * ran; //jitter ray
 	while (samplePos.a <= len) {
-		float val = texture(volume, samplePos.xyz).r;
+		vec4 colorSample = texture(volume, samplePos.xyz);
 		samplePos += deltaDir; //advance ray position
-		if (val < 0.01) continue;
-		backNearest = min(backNearest, samplePos.a); 
-		vec4 colorSample = texture(colormap, vec2(val, 0.5)).rgba;
+		if (colorSample.a < 0.01) continue;
+		backNearest = min(backNearest, samplePos.a);
 		colorSample.a = 1.0-pow((1.0 - colorSample.a), opacityCorrection);
 		colorSample.rgb *= colorSample.a;
 		colAcc= (1.0 - colAcc.a) * colorSample + colAcc;
@@ -119,7 +117,6 @@ void main() {
 	if (samplePos.a < 0.0)
 		vec4 samplePos = vec4(start.xyz, 0.0); //ray position
 	//end: fast pass
-		
 	float overFarthest = len;
 	colAcc = vec4(0.0, 0.0, 0.0, 0.0);
 	samplePos += deltaDir * ran; //jitter ray
@@ -136,7 +133,7 @@ void main() {
 	}
 	float overMix = colAcc.a;
 	float overlayDepth = 0.3;
-	if (fColor.a <= 0.0) 
+	if (fColor.a <= 0.0)
 			overMix = 1.0;
 	else if (((overFarthest) > backNearest)) {
 		float dx = (overFarthest - backNearest)/1.73;
@@ -149,7 +146,7 @@ void main() {
 
 export var vertSliceShader =
 `#version 300 es
-#line 81
+#line 150
 layout(location=0) in vec3 pos;
 uniform int axCorSag;
 uniform float slice;
@@ -173,23 +170,22 @@ void main(void) {
 
 export var fragSliceShader =
 `#version 300 es
-#line 105
+#line 173
 precision highp int;
 precision highp float;
 uniform highp sampler3D volume, overlay;
-uniform highp sampler2D colormap;
 uniform float opacity;
 in vec3 texPos;
 out vec4 color;
 void main() {
-	color = vec4(texture(colormap, vec2(texture(volume, texPos).r, 0.5)).rgb, opacity);
+	color = vec4(texture(volume, texPos).rgb, opacity);
 	vec4 ocolor = texture(overlay, texPos);
 	color.rgb = mix(color.rgb, ocolor.rgb, ocolor.a);
 }`;
 
 export var fragLineShader =
 `#version 300 es
-#line 119
+#line 189
 precision highp int;
 precision highp float;
 uniform vec4 lineColor;
@@ -200,7 +196,7 @@ void main() {
 
 export var vertColorbarShader =
 `#version 300 es
-#line 130
+#line 200
 layout(location=0) in vec3 pos;
 uniform vec2 canvasWidthHeight;
 uniform vec4 leftTopWidthHeight;
@@ -217,7 +213,7 @@ void main(void) {
 
 export var fragColorbarShader =
 `#version 300 es
-#line 147
+#line 217
 precision highp int;
 precision highp float;
 uniform highp sampler2D colormap;
@@ -229,7 +225,7 @@ void main() {
 
 export var vertLineShader =
 `#version 300 es
-#line 159
+#line 229
 layout(location=0) in vec3 pos;
 uniform vec2 canvasWidthHeight;
 uniform vec4 leftTopWidthHeight;
@@ -244,7 +240,7 @@ void main(void) {
 
 export var vertFontShader =
 `#version 300 es
-#line 174
+#line 244
 layout(location=0) in vec3 pos;
 uniform vec2 canvasWidthHeight;
 uniform vec4 leftTopWidthHeight;
@@ -262,7 +258,7 @@ void main(void) {
 
 export var fragFontShader =
 `#version 300 es
-#line 192
+#line 262
 precision highp int;
 precision highp float;
 uniform highp sampler2D fontTexture;
@@ -275,9 +271,57 @@ float median(float r, float g, float b) {
 }
 void main() {
 	vec3 msd = texture(fontTexture, vUV).rgb;
-	//color = vec4(msd, 1.0); return;
-    float sd = median(msd.r, msd.g, msd.b);
+	float sd = median(msd.r, msd.g, msd.b);
     float screenPxDistance = screenPxRange*(sd - 0.5);
     float opacity = clamp(screenPxDistance + 0.5, 0.0, 1.0);
 	color = vec4(fontColor.rgb , fontColor.a * opacity);
+}`;
+
+export var vertOrientShader =
+`#version 300 es
+#line 283
+precision highp int;
+precision highp float;
+in vec3 vPos;
+out vec2 TexCoord;
+void main() {
+    TexCoord = vPos.xy;
+    gl_Position = vec4( (vPos.xy-vec2(0.5,0.5))* 2.0, 0.0, 1.0);
+}`;
+
+export var fragOrientShaderU =
+`#version 300 es
+uniform highp usampler3D intensityVol;
+`;
+
+export var fragOrientShaderI =
+`#version 300 es
+uniform highp isampler3D intensityVol;
+`;
+
+export var fragOrientShaderF =
+`#version 300 es
+uniform highp sampler3D intensityVol;
+`;
+
+export var fragOrientShader =
+`#line 309
+precision highp int;
+precision highp float;
+in vec2 TexCoord;
+out vec4 FragColor;
+uniform float coordZ;
+uniform float scl_slope;
+uniform float scl_inter;
+uniform float cal_max;
+uniform float cal_min;
+uniform highp sampler2D colormap;
+uniform mat4 mtx;
+void main(void) {
+ vec4 vx = vec4(TexCoord.xy, coordZ, 1.0) * mtx;
+ float f = (scl_slope * float(texture(intensityVol, vx.xyz).r)) + scl_inter;
+ float r = max(0.00001, abs(cal_max - cal_min));
+ float mn = min(cal_min, cal_max);
+ f = mix(0.0, 1.0, (f - mn) / r);
+ FragColor = texture(colormap, vec2(f, 0.5)).rgba;
 }`;
