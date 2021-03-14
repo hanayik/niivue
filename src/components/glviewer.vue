@@ -126,7 +126,7 @@ export default {
       this.dialog = false
       this.mouseDown = true
       var rect = canvas.getBoundingClientRect()
-      nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
+      nv.mouseClick(this.gl, e.clientX - rect.left, e.clientY - rect.top)
       nv.mouseDown(e.clientX - rect.left,e.clientY - rect.top)
     })
     
@@ -135,7 +135,7 @@ export default {
       this.dialog = false
       this.touchDown = true
       var rect = canvas.getBoundingClientRect()
-      nv.mouseClick(this.gl, this.overlays[0], e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+      nv.mouseClick(this.gl, e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
       nv.mouseDown(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
     })
 
@@ -144,7 +144,7 @@ export default {
       if (this.mouseDown) {
         var rect = canvas.getBoundingClientRect()
         // mouseClick if any 2D mode
-        nv.mouseClick(this.gl, this.overlays[0], e.clientX - rect.left, e.clientY - rect.top)
+        nv.mouseClick(this.gl, e.clientX - rect.left, e.clientY - rect.top)
         // mouseMove if 3D render mode
         nv.mouseMove(e.clientX - rect.left,e.clientY - rect.top)
       }
@@ -153,7 +153,7 @@ export default {
     gl.canvas.addEventListener('touchmove', (e) => {
       if (this.touchDown && e.touches.length < 2) {
         var rect = canvas.getBoundingClientRect()
-        nv.mouseClick(this.gl, this.overlays[0], e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+        nv.mouseClick(this.gl, e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
         nv.mouseMove(e.touches[0].clientX - rect.left,e.touches[0].clientY - rect.top)
       }
     })
