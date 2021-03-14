@@ -45,9 +45,9 @@ export let Niivue = function(opts={}){
   this.scene.renderElevation = 15
   this.scene.crosshairPos = [0.5, 0.5, 0.5]
   this.scene.clipPlane = [0, 0, 0, 0]
-  this.back = {} // base layer; defines image space to work in
-  this.overlays = [] // layers added on top of base image (e.g. masks or stat maps)
-  this.volumes = [] // base layer(s) // TODO: maybe not needed since we use this.back now?
+  this.back = {} // base layer; defines image space to work in. Defined as this.volumes[0] in Niivue.loadVolumes
+  this.overlays = [] // layers added on top of base image (e.g. masks or stat maps). Essentially everything after this.volumes[0] is an overlay. So is this necessary?
+  this.volumes = [] // all loaded images. Can add in the ability to push or slice as needed
   this.isRadiologicalConvention = false
   this.volScaleMultiplier = 1
   this.mousePos = [0, 0]
@@ -302,46 +302,54 @@ let hdr = overlayItem.volume.hdr;
 	overlayItem.toRAS = mat.mat4.clone(rotM);
 } // nii2RAS()
 
-//TODO: pass in volumeList AND overlayList to load everything
 // currently: volumeList is an array if objects, each object is a volume that can be loaded
 Niivue.prototype.loadVolumes  = function(volumeList) {
   this.volumes = volumeList
-  this.back = this.volumes[0] // load first volume for demo. TODO: change this
-	let hdr = null
-	let img = null
-	let url = this.back.volumeURL
-	let req = new XMLHttpRequest();
-	req.open("GET", url, true);
-	req.responseType = "arraybuffer";
-	req.onerror = function () {
-		console.log = "Error Loading Volume";
-	}
-	req.onload = function () {
-		let dataBuffer = req.response;
-		if (dataBuffer) {
-			hdr = nii.readHeader(dataBuffer);
-			if (nii.isCompressed(dataBuffer)) {
-				img = nii.readImage(hdr, nii.decompress(dataBuffer));
-			} else {
-				img = nii.readImage(hdr, dataBuffer);
-			}
-		} else {
-			alert("Unable to load buffer properly from volume?");
-			console.log("no buffer?");
-		}
-    this.back.volume = {}
-    this.back.volume.hdr = hdr
-    this.back.volume.img = img
-    this.nii2RAS(this.back)
-		//_overlayItem = overlayItem
-		this.selectColormap(this.back.colorMap)
-		this.updateGLVolume(this.back)
-	}.bind(this) // bind "this" niivue instance context
-	req.send();
-	return this
+  this.back = this.volumes[0] // load first volume as back layer
+  this.overlays = this.volumes.slice(1) // remove first element (that is now this.back, all other imgaes are overlays)
+  let xhr = []
+  let hdr = null
+  let img = null
+  // for loop to load all volumes in volumeList
+  for (let i=0; i<volumeList.length; i++){
+    console.log("loading ", volumeList[i].url)
+    let url = this.volumes[i].url
+    xhr.push(new XMLHttpRequest());
+    xhr[i].open("GET", url, true);
+    xhr[i].responseType = "arraybuffer";
+    xhr[i].onerror = function () {
+      console.error("error loading volume ", this.volumes[i].url)
+    }
+    xhr[i].onload = function () {
+      let dataBuffer = xhr[i].response;
+      hdr = null
+      img = null
+      if (dataBuffer) {
+        hdr = nii.readHeader(dataBuffer);
+        if (nii.isCompressed(dataBuffer)) {
+          img = nii.readImage(hdr, nii.decompress(dataBuffer));
+        } else {
+          img = nii.readImage(hdr, dataBuffer);
+        }
+      } else {
+        alert("Unable to load buffer properly from volume?");
+        console.log("no buffer?");
+      }
+      this.volumes[i].volume = {}
+      this.volumes[i].volume.hdr = hdr
+      this.volumes[i].volume.img = img
+      this.nii2RAS(this.volumes[i])
+      //_overlayItem = overlayItem
+      this.selectColormap(this.volumes[0].colorMap) //only base image for now
+      this.updateGLVolume(this.volumes[0])
+    }.bind(this) // bind "this" niivue instance context
+    xhr[i].send();
+  } // for
+		return this
 } // loadVolume()
 
-Niivue.prototype.rgbaTex = function(texID, activeID, dims, isInit = false) {
+
+Niivue.prototype.rgbaTex = function(texID, activeID, dims, isInit=false) {
 	if (texID)
 		this.gl.deleteTexture(texID);
 	texID = this.gl.createTexture();
@@ -479,9 +487,24 @@ Niivue.prototype.init = async function () {
 } // init()
 
 Niivue.prototype.updateGLVolume = function(overlayItem) { //load volume or change contrast
-  this.refreshLayers(overlayItem, true);
-	this.refreshLayers(overlayItem, false); //<- _DEMO load overlay
-	this.drawScene(); // TODO: drawScene should draw all volumes and overlays
+  //this.refreshLayers(overlayItem, true);
+	//this.refreshLayers(overlayItem, false); //<- _DEMO load overlay
+  console.log(overlayItem) // avoid unused variable error for now (can prob remove overlayItem TODO)
+  let isBaseLayer = true
+  // loop through loading volumes in this.volumes
+  for (let i=0; i<this.volumes.length; i++){
+    // i == 0 is probably base layer so load it as such
+    if (i === 0) {
+      if (this.volumes[i].toRAS) // avoid trying to refresh a volume that isn't ready
+        this.refreshLayers(this.volumes[i], isBaseLayer);
+    } else {
+      // i > 0 probably not base layer, so set isBaseLayer to false
+      isBaseLayer = false
+      if (this.volumes[i].toRAS) // avoid trying to refresh a volume that isn't ready
+        this.refreshLayers(this.volumes[i], isBaseLayer);
+    }
+  }
+	this.drawScene(); // TODO: drawScene should draw all volumes and overlays (kinda does now I guess)
 } // updateVolume()
 
 Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
@@ -495,9 +518,15 @@ Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
 		this.back.matRAS = overlayItem.matRAS;
 		this.back.dims = overlayItem.dimsRAS;
 		this.back.pixDims = overlayItem.pixDimsRAS;
-		outTexture = this.rgbaTex(this.volumeTexture, this.gl.TEXTURE0, this.back.dims);
-	} else
+		outTexture = this.rgbaTex(this.volumeTexture, this.gl.TEXTURE0, overlayItem.dimsRAS); //this.back.dims)
+	} else {
+    this.back = {};
+		mtx = overlayItem.toRAS;
+		this.back.matRAS = overlayItem.matRAS;
+		this.back.dims = overlayItem.dimsRAS;
+		this.back.pixDims = overlayItem.pixDimsRAS;
 		outTexture = this.rgbaTex(this.overlayTexture, this.gl.TEXTURE2, this.back.dims);
+  }
 	let fb = this.gl.createFramebuffer();
 	this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fb);
 	this.gl.disable(this.gl.CULL_FACE);
@@ -547,9 +576,9 @@ Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
 	this.gl.uniform1f(orientShader.uniforms["cal_max"], hdr.cal_max);
 	if (!isBackground) { //TODO: this just makes the overlay look different
 		mtx = [-1,0,0,1, 0,1,0,0, 0,0,1,0, 0,0,0,1]; //TODO: a few profound lines here for affine transform (usimg frac2mm, mm2frac)
-		this.selectColormap("Winter")
-		this.gl.uniform1f(orientShader.uniforms["cal_min"], 70);
-		this.gl.uniform1f(orientShader.uniforms["cal_max"], 80);
+		this.selectColormap("Warm")
+		this.gl.uniform1f(orientShader.uniforms["cal_min"], 0);
+		this.gl.uniform1f(orientShader.uniforms["cal_max"], 1);
 	}
 	this.gl.bindTexture(this.gl.TEXTURE_3D, tempTex3D);
 	this.gl.uniform1i(orientShader.uniforms["intensityVol"], 6);
@@ -626,6 +655,9 @@ Niivue.prototype.sliceScale = function() {
 } // sliceScale()
 
 Niivue.prototype.mouseClick = function(x, y, posChange=0, isDelta=true) {
+  var posNow
+	var posFuture
+
   if (this.sliceType === this.sliceTypeRender)
 		return
 	//console.log("Click pixels (x,y):", x, y);
@@ -655,8 +687,8 @@ Niivue.prototype.mouseClick = function(x, y, posChange=0, isDelta=true) {
 				return;
 			}
 			if ( posChange !== 0) {
-				var posNow = this.scene.crosshairPos[2 - axCorSag]
-				var posFuture = posNow + posChange
+				posNow = this.scene.crosshairPos[2 - axCorSag]
+				posFuture = posNow + posChange
 				if (posFuture > 1) posFuture = 1;
 				if (posFuture < 0) posFuture = 0;
 				//console.log(scrollVal,':',axCorSag, '>>', posFuture);
@@ -678,8 +710,15 @@ Niivue.prototype.mouseClick = function(x, y, posChange=0, isDelta=true) {
 			}
 			this.drawScene()
 			return;
-		} //if click in slice i
-	} //for i: each slice on screen
+		} else {//if click in slice i
+      // if x and y are null, likely due to a slider widget sending the posChange (no mouse info in that case)
+      if (x === null && y === null){
+        this.scene.crosshairPos[2-axCorSag] = posChange
+        this.drawScene()
+        return
+      }
+    }
+  } //for i: each slice on screen
 } // mouseClick()
 
 Niivue.prototype.drawColorbar = function(leftTopWidthHeight) {
@@ -909,7 +948,7 @@ Niivue.prototype.drawScene = function() {
 		let leftTopWidthHeight = this.scaleSlice(volScale[0], volScale[2]);
 		this.draw2D(leftTopWidthHeight, 1);
 	} else if (this.sliceType === this.sliceTypeSagittal) { //draw sagittal
-		let leftTopWidthHeight = this.scaleSlice(this.gl, volScale[1], volScale[2]);
+		let leftTopWidthHeight = this.scaleSlice(volScale[1], volScale[2]);
 		this.draw2D(leftTopWidthHeight, 2);
 	} else { //sliceTypeMultiplanar
 		let ltwh = this.scaleSlice(volScale[0]+volScale[1], volScale[1]+volScale[2]);

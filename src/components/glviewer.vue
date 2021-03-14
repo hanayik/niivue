@@ -228,7 +228,6 @@ export default {
     window.addEventListener('resize', this.onWindowResize)
 
     this.niivue = new Niivue({}).attachTo('#gl')
-    console.log(this.niivue)
 
     this.gl = gl;
     

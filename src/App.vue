@@ -144,9 +144,9 @@ export default {
       coordinateString: '0x0x0',
       overlayList: [
         {
-          volumeURL: "./RAS.nii.gz",
+          url: "./brain.nii.gz",//"./RAS.nii.gz", "./spm152.nii.gz",
           volume: {hdr: null, img: null},
-          name: "standard",
+          name: "brain",
           intensityMin: 0,
           intensityMax: 100,
           intensityRange:[0, 100],
@@ -154,9 +154,9 @@ export default {
           opacity: 100,
         },
         {
-          volumeURL: "./motor.nii.gz",
+          url: "./hippo.nii.gz",
           volume: {hdr: null, img: null},
-          name: "motor",
+          name: "hippo",
           intensityMin: 0,
           intensityMax: 100,
           intensityRange:[0, 100],
