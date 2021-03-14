@@ -45,7 +45,7 @@ export let Niivue = function(opts){
   this.scene.renderElevation = 15
   this.scene.crosshairPos = [0.5, 0.5, 0.5]
   this.scene.clipPlane = [0, 0, 0, 0]
-  this.back = null // base layer; defines image space to work in
+  this.back = [] // base layer; defines image space to work in
   this.overlays = [] // layers added on top of base image (e.g. masks or stat maps)
   this.volumes = [] // base layer(s)
   this.isRadiologicalConvention = false
@@ -106,7 +106,7 @@ Niivue.prototype.sph2cartDeg = function sph2cartDeg(azimuth, elevation) {
  return ret;
 } // sph2cartDeg()
 
-Niivue.prototype.setClipPlane = function (azimuthElevationDepth) {
+Niivue.prototype.clipPlaneUpdate = function (azimuthElevationDepth) {
 	// azimuthElevationDepth is 3 component vector [a, e, d]
 	//  azimuth: camera position in degrees around object, typically 0..360 (or -180..+180)
 	//  elevation: camera height in degrees, range -90..90
@@ -302,10 +302,11 @@ let hdr = overlayItem.volume.hdr;
 	overlayItem.toRAS = mat.mat4.clone(rotM);
 } // nii2RAS()
 
-//TODO: pass in volumeList and overlayList to load everything
+//TODO: pass in volumeList AND overlayList to load everything
+// currently: volumeList is an array if objects, each object is a volume that can be loaded
 Niivue.prototype.loadVolumes  = function(volumeList) {
   this.volumes = volumeList
-  let overlayItem = this.volumes[0] // load first volume for demo
+  let overlayItem = this.volumes[0] // load first volume for demo. TODO: change this
 	let hdr = null
 	let img = null
 	let url = overlayItem.volumeURL
@@ -480,7 +481,7 @@ Niivue.prototype.init = async function () {
 Niivue.prototype.updateGLVolume = function(overlayItem) { //load volume or change contrast
   this.refreshLayers(overlayItem, true);
 	this.refreshLayers(overlayItem, false); //<- _DEMO load overlay
-	this.drawScene(); // TODO: drawScene should draw all volumes in this.overlays
+	this.drawScene(); // TODO: drawScene should draw all volumes and overlays
 } // updateVolume()
 
 Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
@@ -489,7 +490,7 @@ Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
 	let outTexture = [];
 	let mtx = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]; //identity matrix: no change
 	if (isBackground) {
-		this.back = [];
+		this.back = {};
 		mtx = overlayItem.toRAS;
 		this.back.matRAS = overlayItem.matRAS;
 		this.back.dims = overlayItem.dimsRAS;
@@ -615,7 +616,6 @@ Niivue.prototype.makeLut = function(Rs, Gs, Bs, As, Is) {
 	return lut;
 } // makeLut()
 
-// TODO: ?? maybe pass in overlayList to scale all volumes
 Niivue.prototype.sliceScale = function() {
   var dims = [1.0, this.back.dims[1] * this.back.pixDims[1], this.back.dims[2] * this.back.pixDims[2], this.back.dims[3] * this.back.pixDims[3]];
 	var longestAxis = Math.max(dims[1], Math.max(dims[2], dims[3]));

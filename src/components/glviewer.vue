@@ -22,7 +22,7 @@
 </template>
 <script>
 import * as Hammer from 'hammerjs';
-import * as nv from "../niivue.js";
+import {Niivue} from "../niivue.js";
 import {bus} from "@/bus.js"
 
 
@@ -127,7 +127,7 @@ export default {
       this.touchDown = true
       var rect = canvas.getBoundingClientRect()
       this.niivue.mouseClick(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
-      nv.mouseDown(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+      this.niivue.mouseDown(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
     })
 
     
@@ -227,7 +227,7 @@ export default {
 
     window.addEventListener('resize', this.onWindowResize)
 
-    this.niivue = new nv.Niivue({}).attachTo('#gl')
+    this.niivue = new Niivue({}).attachTo('#gl')
     console.log(this.niivue)
 
     this.gl = gl;
