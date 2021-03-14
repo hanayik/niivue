@@ -87,7 +87,7 @@ export default {
         viewer.style.height = document.documentElement.clientHeight - bottomStatusBarHeight
         canvas.height = document.documentElement.clientHeight - bottomStatusBarHeight
       }
-      this.niivue.drawSlices(this.gl, this.overlays[this.selectedOverlay])
+      this.niivue.drawScene()
     },
 
     onCrosshairColorChange: function() {

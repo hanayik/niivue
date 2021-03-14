@@ -10,7 +10,7 @@ import { vertOrientShader, fragOrientShaderU, fragOrientShaderI, fragOrientShade
 
 //import {bus} from "@/bus.js"
 
-export let Niivue = function(opts){
+export let Niivue = function(opts={}){
   this.opts = {} // will be populate with opts or defaults when a new Niivue object instance is created
   this.defaults = {
     textHeight: 0.03,  // 0 for no text, fraction of canvas height
@@ -45,9 +45,9 @@ export let Niivue = function(opts){
   this.scene.renderElevation = 15
   this.scene.crosshairPos = [0.5, 0.5, 0.5]
   this.scene.clipPlane = [0, 0, 0, 0]
-  this.back = [] // base layer; defines image space to work in
+  this.back = {} // base layer; defines image space to work in
   this.overlays = [] // layers added on top of base image (e.g. masks or stat maps)
-  this.volumes = [] // base layer(s)
+  this.volumes = [] // base layer(s) // TODO: maybe not needed since we use this.back now?
   this.isRadiologicalConvention = false
   this.volScaleMultiplier = 1
   this.mousePos = [0, 0]
@@ -306,10 +306,10 @@ let hdr = overlayItem.volume.hdr;
 // currently: volumeList is an array if objects, each object is a volume that can be loaded
 Niivue.prototype.loadVolumes  = function(volumeList) {
   this.volumes = volumeList
-  let overlayItem = this.volumes[0] // load first volume for demo. TODO: change this
+  this.back = this.volumes[0] // load first volume for demo. TODO: change this
 	let hdr = null
 	let img = null
-	let url = overlayItem.volumeURL
+	let url = this.back.volumeURL
 	let req = new XMLHttpRequest();
 	req.open("GET", url, true);
 	req.responseType = "arraybuffer";
@@ -329,13 +329,13 @@ Niivue.prototype.loadVolumes  = function(volumeList) {
 			alert("Unable to load buffer properly from volume?");
 			console.log("no buffer?");
 		}
-    this.volumes[0].volume = {}
-    this.volumes[0].volume.hdr = hdr
-    this.volumes[0].volume.img = img
-    this.nii2RAS(this.volumes[0])
+    this.back.volume = {}
+    this.back.volume.hdr = hdr
+    this.back.volume.img = img
+    this.nii2RAS(this.back)
 		//_overlayItem = overlayItem
-		this.selectColormap(this.volumes[0].colorMap)
-		this.updateGLVolume(this.volumes[0])
+		this.selectColormap(this.back.colorMap)
+		this.updateGLVolume(this.back)
 	}.bind(this) // bind "this" niivue instance context
 	req.send();
 	return this
