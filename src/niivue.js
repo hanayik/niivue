@@ -88,7 +88,7 @@ Niivue.prototype.mouseMove = function mouseMove(x, y) {
 	this.scene.renderAzimuth += x - this.mousePos[0];
 	this.scene.renderElevation += y - this.mousePos[1];
 	this.mousePos = [x,y];
-	this.drawScene() // TODO: change drawSlices to drawScene
+	this.drawScene()
 } // mouseMove()
 
 Niivue.prototype.sph2cartDeg = function sph2cartDeg(azimuth, elevation) {
@@ -302,7 +302,7 @@ let hdr = overlayItem.volume.hdr;
 	overlayItem.toRAS = mat.mat4.clone(rotM);
 } // nii2RAS()
 
-//TODO: pass in overlayList and load all volumes in list
+//TODO: pass in volumeList and overlayList to load everything
 Niivue.prototype.loadVolumes  = function(volumeList) {
   this.volumes = volumeList
   let overlayItem = this.volumes[0] // load first volume for demo
@@ -333,7 +333,6 @@ Niivue.prototype.loadVolumes  = function(volumeList) {
     this.volumes[0].volume.img = img
     this.nii2RAS(this.volumes[0])
 		//_overlayItem = overlayItem
-    console.log(this.volumes)
 		this.selectColormap(this.volumes[0].colorMap)
 		this.updateGLVolume(this.volumes[0])
 	}.bind(this) // bind "this" niivue instance context
@@ -626,7 +625,7 @@ Niivue.prototype.sliceScale = function() {
 	return { volScale, vox }
 } // sliceScale()
 
-Niivue.prototype.mouseClick = function(x, y, posChange, isDelta=true) {
+Niivue.prototype.mouseClick = function(x, y, posChange=0, isDelta=true) {
   if (this.sliceType === this.sliceTypeRender)
 		return
 	//console.log("Click pixels (x,y):", x, y);
