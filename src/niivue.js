@@ -576,9 +576,9 @@ Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
 	this.gl.uniform1f(orientShader.uniforms["cal_max"], hdr.cal_max);
 	if (!isBackground) { //TODO: this just makes the overlay look different
 		mtx = [-1,0,0,1, 0,1,0,0, 0,0,1,0, 0,0,0,1]; //TODO: a few profound lines here for affine transform (usimg frac2mm, mm2frac)
-		this.selectColormap("Warm")
-		this.gl.uniform1f(orientShader.uniforms["cal_min"], 0);
-		this.gl.uniform1f(orientShader.uniforms["cal_max"], 1);
+		this.selectColormap(overlayItem.colorMap)
+		this.gl.uniform1f(orientShader.uniforms["cal_min"], hdr.cal_min);
+		this.gl.uniform1f(orientShader.uniforms["cal_max"], hdr.cal_max);
 	}
 	this.gl.bindTexture(this.gl.TEXTURE_3D, tempTex3D);
 	this.gl.uniform1i(orientShader.uniforms["intensityVol"], 6);

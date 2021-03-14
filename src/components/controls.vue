@@ -23,8 +23,8 @@
             <v-row>
               <v-select
                 :items="colorMaps"
-                v-model="selectedColorMap"
-                @change="onColorChange"
+                v-model="overlay.colorMap"
+                @change="onColorChange(i)"
                 label="Color map">
               </v-select>
             </v-row>
@@ -75,7 +75,7 @@
                   min="0"
                   thumb-label
                   ticks
-                  @input="onOpacityChange"
+                  @input="onOpacityChange(i)"
                 >
                 </v-slider>
               </v-col>
@@ -108,9 +108,9 @@ export default {
 
   data (){
     return {
-      colorSelected: 'gray',
+      //colorSelected: 'gray',
       colorMaps:['gray', 'Winter', 'Warm', 'Plasma', 'Viridis', 'Inferno'],
-      selectedColorMap: 'gray',
+      //selectedColorMap: 'gray',
       eyeIcon: "mdi-eye",
       overlays_: this.overlays,
       draggable: true,
@@ -124,8 +124,9 @@ export default {
       this.eyeIcon = this.eyeIcon == "mdi-eye" ? "mdi-eye-off" : "mdi-eye"
     },
 
-    onColorChange: function() {
-      bus.$emit('colormap-change', this.selectedColorMap);
+    onColorChange: function(i) {
+      console.log(i)
+      bus.$emit('colormap-change');
 
     },
 
