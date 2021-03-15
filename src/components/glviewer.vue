@@ -255,8 +255,9 @@ export default {
       this.niivue.loadVolumes(this.overlays); 
     }.bind(this));
 
-
-
+    bus.$on('refresh', function () {
+      this.niivue.loadVolumes(this.overlays); 
+    }.bind(this));
   },
 };
 
