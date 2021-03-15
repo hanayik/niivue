@@ -152,6 +152,8 @@ Niivue.prototype.attachTo = function (id) {
   return this
 } // attachTo
 
+
+// TODO: remove this method (no used)
 Niivue.prototype.scaleTo8Bit = function (A, volume) {
 	var mn = volume.hdr.cal_min;
 	var mx = volume.hdr.cal_max;
@@ -200,6 +202,8 @@ Niivue.prototype.overlayRGBA = function (volume) {
 	return imgRGBA;
 } // overlayRGBA()
 
+
+// TODO: remove this method (not used)
 Niivue.prototype.calibrateIntensity = function(A, volume) {
   var vox = A.length;
 	var mn = Infinity;
@@ -507,9 +511,30 @@ Niivue.prototype.updateGLVolume = function(overlayItem) { //load volume or chang
 	this.drawScene(); // TODO: drawScene should draw all volumes and overlays (kinda does now I guess)
 } // updateVolume()
 
+// given an overlayItem and its img TypedArray, calculate 2% and 98% display range if needed
+Niivue.prototype.calMinMax = function(overlayItem, img){
+  if (overlayItem.volume.hdr.cal_min !== 0 && overlayItem.volume.hdr.cal_max !== 0){
+    console.log("not setting the calmin and max")
+    return
+  }
+  let mn=0
+  let mx=0
+  for (let i=0; i<img.length; i++){
+    mn = Math.min(img[i],mn)
+    mx = Math.max(img[i],mx)
+  }
+  let p02 = mx*0.02
+  let p98 = mx*0.98
+  overlayItem.volume.hdr.cal_min = p02
+  overlayItem.volume.hdr.cal_max = p98
+  // returns nothing, modifies overlayItem in place
+}
+
 Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
+
 	let hdr = overlayItem.volume.hdr
 	let img = overlayItem.volume.img
+  let imgRaw
 	let outTexture = [];
 	let mtx = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]; //identity matrix: no change
 	if (isBackground) {
@@ -545,31 +570,35 @@ Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
 	//https://www.khronos.org/registry/OpenGL-Refpages/es3.0/html/glTexStorage3D.xhtml
 	let orientShader = this.orientShaderU;
 	if (hdr.datatypeCode === 2) { // raw input data
-		let imgRaw = new Uint8Array(img);
+		imgRaw = new Uint8Array(img);
 		this.gl.texStorage3D(this.gl.TEXTURE_3D, 6, this.gl.R8UI, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
 		this.gl.texSubImage3D(this.gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], this.gl.RED_INTEGER, this.gl.UNSIGNED_BYTE, imgRaw);
 	} else if (hdr.datatypeCode === 4) {
-		let imgRaw = new Int16Array(img);
+		imgRaw = new Int16Array(img);
 		this.gl.texStorage3D(this.gl.TEXTURE_3D, 6, this.gl.R16I, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
 		this.gl.texSubImage3D(this.gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], this.gl.RED_INTEGER, this.gl.SHORT, imgRaw);
 		orientShader = this.orientShaderI;
 	} else if (hdr.datatypeCode === 16) {
-		let imgRaw = new Float32Array(img);
+		imgRaw = new Float32Array(img);
 		this.gl.texStorage3D(this.gl.TEXTURE_3D, 6, this.gl.R32F, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
 		this.gl.texSubImage3D(this.gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], this.gl.RED, this.gl.FLOAT, imgRaw);
 		orientShader = this.orientShaderF;
 	} else if (hdr.datatypeCode === 64) {
-		let imgRaw = new Float64Array(img)
+		imgRaw = new Float64Array(img)
 		let img32f = new Float32Array;
 		img32f = Float32Array.from(imgRaw);
 		this.gl.texStorage3D(this.gl.TEXTURE_3D, 6, this.gl.R32F, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
 		this.gl.texSubImage3D(this.gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], this.gl.RED, this.gl.FLOAT, img32f);
 		orientShader = this.orientShaderF;
 	} else if (hdr.datatypeCode === 512) {
-		let imgRaw = new Uint16Array(img);
+		imgRaw = new Uint16Array(img);
 		this.gl.texStorage3D(this.gl.TEXTURE_3D, 6, this.gl.R16UI, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
 		this.gl.texSubImage3D(this.gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], this.gl.RED_INTEGER, this.gl.UNSIGNED_SHORT, imgRaw);
 	}
+
+  // set display cal_min, cal_max display range if required
+  this.calMinMax(overlayItem, imgRaw)
+
 	orientShader.use(this.gl);
 	this.selectColormap(overlayItem.colorMap)
 	this.gl.uniform1f(orientShader.uniforms["cal_min"], hdr.cal_min);

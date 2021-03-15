@@ -21,7 +21,7 @@
       <v-row style="height:100%">
       <!-- app uses a 12 column layout, so the controls take up 4 columns on the left of the screen -->
       <v-col sm=12 md=12 lg=4>
-        <controls :overlays="overlayList">
+        <controls :overlays="urlOverlayList">
         </controls>
       </v-col>
 
@@ -98,7 +98,7 @@
         </v-expansion-panel>
       </v-expansion-panels>
 
-        <glviewer :overlays="overlayList"></glviewer>
+        <glviewer :overlays="urlOverlayList"></glviewer>
       </v-col>
     </v-row>
     </v-main>
@@ -163,8 +163,37 @@ export default {
           colorMap: "Warm", // gray
           opacity: 100,
         },
-
       ]
+    }
+  },
+
+  computed: {
+    urlOverlayList: function(){
+      let vols = []
+      if (this.$route.query.urls === undefined || this.$route.query.urls === null || this.$route.query.urls === ''){
+        return this.overlayList
+      }
+      let urls = this.$route.query.urls.split(",")
+      for (let i=0; i<urls.length; i++){
+        vols.push(
+          { 
+            url: urls[i],
+            volume:{hdr:null, img:null},
+            name: urls[i].split('/').pop(),
+            intensityMin:0,
+            intensityMax:100,
+            intensityRange: [0,100],
+            colorMap: "gray",
+            opacity: 100
+          }
+        )
+      }
+      if (vols.length > 0){
+        bus.$emit('refresh');
+        return vols
+      } else {
+        return this.overlayList // defaults
+      }
     }
   },
 
