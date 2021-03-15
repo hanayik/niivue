@@ -251,6 +251,11 @@ export default {
       this.niivue.clipPlaneUpdate(newPlanes)
     }.bind(this));
 
+    bus.$on('colormap-change', function () {
+      this.niivue.loadVolumes(this.overlays); 
+    }.bind(this));
+
+
 
   },
 };
