@@ -154,7 +154,7 @@ export default {
           opacity: 100,
         },
         {
-          url: "./hippo.nii.gz",
+          url: "./IPL.nii.gz", //"./hippo.nii.gz",
           volume: {hdr: null, img: null},
           name: "hippo",
           intensityMin: 0,

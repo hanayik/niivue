@@ -188,14 +188,10 @@ Niivue.prototype.overlayRGBA = function (volume) {
 				let dist = Math.sqrt(dx*dx + dy*dy + dz * dz);
 				let v = 0;
 				if (dist < radius) v = 255;
-				imgRGBA[j] = 0; //Red
-				j++;
-				imgRGBA[j] = v; //Green
-				j++;
-				imgRGBA[j] = 0; //Blue
-				j++;
-				imgRGBA[j] = v * 0.5; //Alpha
-				j++;
+				imgRGBA[j++] = 0; //Red
+				imgRGBA[j++] = v; //Green
+				imgRGBA[j++] = 0; //Blue
+				imgRGBA[j++] = v * 0.5; //Alpha
 			}
 		}
 	}
@@ -233,6 +229,15 @@ Niivue.prototype.calibrateIntensity = function(A, volume) {
 	}
 } // calibrateIntensity()
 
+Niivue.prototype.vox2mm = function (XYZ, mtx ) {
+	let sform = mat.mat4.clone(mtx);
+	mat.mat4.transpose(sform, sform);
+	let pos = mat.vec4.fromValues(XYZ[0], XYZ[1], XYZ[2], 1);
+	mat.vec4.transformMat4(pos, pos, sform);
+	let pos3 = mat.vec3.fromValues(pos[0], pos[1], pos[2]);
+	return pos3;
+} // vox2mm()
+
 Niivue.prototype.nii2RAS = function (overlayItem) {
   //Transform to orient NIfTI image to Left->Right,Posterior->Anterior,Inferior->Superior (48 possible permutations)
 // port of Matlab reorient() https://github.com/xiangruili/dicm2nii/blob/master/nii_viewer.m
@@ -269,6 +274,11 @@ let hdr = overlayItem.volume.hdr;
     perm[ixyz[1]-1] = 2;
     perm[ixyz[2]-1] = 3;
 	let rotM = mat.mat4.fromValues(a[0][0],a[0][1],a[0][2],a[0][3], a[1][0],a[1][1],a[1][2],a[1][3], a[2][0],a[2][1],a[2][2],a[2][3], 0,0,0,1);
+	//n.b. 0.5 in these values to account for voxel centers, e.g. a 3-pixel wide bitmap in unit space has voxel centers at 0.25, 0.5 and 0.75
+	overlayItem.mm000 = this.vox2mm([-0.5, -0.5, -0.5], rotM);
+	overlayItem.mm100 = this.vox2mm([hdr.dims[1]-0.5, -0.5, -0.5], rotM);
+	overlayItem.mm010 = this.vox2mm([-0.5, hdr.dims[2]-0.5, -0.5], rotM);
+	overlayItem.mm001 = this.vox2mm([-0.5, -0.5, hdr.dims[3]-0.5], rotM);
 	let R = mat.mat4.create();
 	mat.mat4.copy(R, rotM);
 	for (let i = 0; i < 3; i++)
@@ -493,14 +503,16 @@ Niivue.prototype.init = async function () {
 Niivue.prototype.updateGLVolume = function(overlayItem) { //load volume or change contrast
   //this.refreshLayers(overlayItem, true);
 	//this.refreshLayers(overlayItem, false); //<- _DEMO load overlay
-  console.log(overlayItem) // avoid unused variable error for now (can prob remove overlayItem TODO)
+  console.log('todo', overlayItem) // avoid unused variable error for now (can prob remove overlayItem TODO)
   let isBaseLayer = true
   // loop through loading volumes in this.volumes
   for (let i=0; i<this.volumes.length; i++){
     // i == 0 is probably base layer so load it as such
     if (i === 0) {
-      if (this.volumes[i].toRAS) // avoid trying to refresh a volume that isn't ready
-        this.refreshLayers(this.volumes[i], isBaseLayer);
+		if (this.volumes[i].toRAS) // avoid trying to refresh a volume that isn't ready
+			this.refreshLayers(this.volumes[i], isBaseLayer);
+		else
+			return; //Exit: unable to render overlays until background is loaded! 
     } else {
       // i > 0 probably not base layer, so set isBaseLayer to false
       isBaseLayer = false
@@ -536,7 +548,7 @@ Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
 	let img = overlayItem.volume.img
   let imgRaw
 	let outTexture = [];
-	let mtx = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]; //identity matrix: no change
+	let mtx = []; 
 	if (isBackground) {
 		this.back = {};
 		mtx = overlayItem.toRAS;
@@ -545,11 +557,23 @@ Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
 		this.back.pixDims = overlayItem.pixDimsRAS;
 		outTexture = this.rgbaTex(this.volumeTexture, this.gl.TEXTURE0, overlayItem.dimsRAS); //this.back.dims)
 	} else {
-    this.back = {};
-		mtx = overlayItem.toRAS;
-		this.back.matRAS = overlayItem.matRAS;
-		this.back.dims = overlayItem.dimsRAS;
-		this.back.pixDims = overlayItem.pixDimsRAS;
+		if (this.back.dims === undefined)
+			console.log('Fatal error: Unable to render overlay: background dimensions not defined!');
+		let f000 = this.mm2frac(overlayItem.mm000); //origin in output space
+		let f100 = this.mm2frac(overlayItem.mm100);
+		let f010 = this.mm2frac(overlayItem.mm010);
+		let f001 = this.mm2frac(overlayItem.mm001);
+		f100 = mat.vec3.subtract(f100, f100, f000); // direction of i dimension from origin
+		f010 = mat.vec3.subtract(f010, f010, f000); // direction of j dimension from origin
+		f001 = mat.vec3.subtract(f001, f001, f000); // direction of k dimension from origin
+
+		mtx = mat.mat4.fromValues(
+			f100[0],f100[1],f100[2],f000[0],
+			f010[0],f010[1],f010[2],f000[1], 
+			f001[0],f001[1],f001[2],f000[2], 
+			0,0,0,1);
+		mat.mat4.invert(mtx, mtx);
+		//console.log('v2', mtx);
 		outTexture = this.rgbaTex(this.overlayTexture, this.gl.TEXTURE2, this.back.dims);
   }
 	let fb = this.gl.createFramebuffer();
@@ -603,12 +627,6 @@ Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
 	this.selectColormap(overlayItem.colorMap)
 	this.gl.uniform1f(orientShader.uniforms["cal_min"], hdr.cal_min);
 	this.gl.uniform1f(orientShader.uniforms["cal_max"], hdr.cal_max);
-	if (!isBackground) { //TODO: this just makes the overlay look different
-		mtx = [-1,0,0,1, 0,1,0,0, 0,0,1,0, 0,0,0,1]; //TODO: a few profound lines here for affine transform (usimg frac2mm, mm2frac)
-		this.selectColormap(overlayItem.colorMap)
-		this.gl.uniform1f(orientShader.uniforms["cal_min"], hdr.cal_min);
-		this.gl.uniform1f(orientShader.uniforms["cal_max"], hdr.cal_max);
-	}
 	this.gl.bindTexture(this.gl.TEXTURE_3D, tempTex3D);
 	this.gl.uniform1i(orientShader.uniforms["intensityVol"], 6);
 	this.gl.uniform1i(orientShader.uniforms["colormap"], 1);
@@ -915,7 +933,7 @@ Niivue.prototype.draw3D = function() {
 	return posString;
 } // draw3D()
 
-Niivue.prototype.mm2frac = function(mm) {
+Niivue.prototype.mm2frac = function(mm ) {
   //given mm, return volume fraction
 	//convert from object space in millimeters to normalized texture space XYZ= [0..1, 0..1 ,0..1]
 	let mm4 = mat.vec4.fromValues( mm[0], mm[1], mm[2],1);
