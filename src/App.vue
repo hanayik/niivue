@@ -143,24 +143,25 @@ export default {
       appTabs: ['Menu', 'Draw', 'Edit', 'Scripting'],
       coordinateString: '0x0x0',
       overlayList: [
+      // first item is brackground image
         {
-          url: "./brain.nii.gz",//"./RAS.nii.gz", "./spm152.nii.gz",
+          url: "./LAS.nii.gz",//"./RAS.nii.gz", "./spm152.nii.gz",
           volume: {hdr: null, img: null},
-          name: "brain",
-          intensityMin: 0,
-          intensityMax: 100,
-          intensityRange:[0, 100],
-          colorMap: "gray", // gray
+          name: "LAS.nii.gz",
+          intensityMin: 0, // not used yet
+          intensityMax: 100, // not used yet
+          intensityRange:[0, 100], // not used yet
+          colorMap: "gray",
           opacity: 100,
         },
         {
           url: "./IPL.nii.gz", //"./hippo.nii.gz",
           volume: {hdr: null, img: null},
-          name: "hippo",
-          intensityMin: 0,
-          intensityMax: 100,
-          intensityRange:[0, 100],
-          colorMap: "Warm", // gray
+          name: "IPL.nii.gz",
+          intensityMin: 0, // not used yet
+          intensityMax: 100, // not used yet
+          intensityRange:[0, 100], // not used yet
+          colorMap: "Winter",
           opacity: 100,
         },
       ]

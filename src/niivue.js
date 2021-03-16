@@ -512,7 +512,7 @@ Niivue.prototype.updateGLVolume = function(overlayItem) { //load volume or chang
 		if (this.volumes[i].toRAS) // avoid trying to refresh a volume that isn't ready
 			this.refreshLayers(this.volumes[i], isBaseLayer);
 		else
-			return; //Exit: unable to render overlays until background is loaded! 
+			return; //Exit: unable to render overlays until background is loaded!
     } else {
       // i > 0 probably not base layer, so set isBaseLayer to false
       isBaseLayer = false
@@ -548,7 +548,7 @@ Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
 	let img = overlayItem.volume.img
   let imgRaw
 	let outTexture = [];
-	let mtx = []; 
+	let mtx = [];
 	if (isBackground) {
 		this.back = {};
 		mtx = overlayItem.toRAS;
@@ -569,8 +569,8 @@ Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
 
 		mtx = mat.mat4.fromValues(
 			f100[0],f100[1],f100[2],f000[0],
-			f010[0],f010[1],f010[2],f000[1], 
-			f001[0],f001[1],f001[2],f000[2], 
+			f010[0],f010[1],f010[2],f000[1],
+			f001[0],f001[1],f001[2],f000[2],
 			0,0,0,1);
 		mat.mat4.invert(mtx, mtx);
 		//console.log('v2', mtx);
