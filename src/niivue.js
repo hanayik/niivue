@@ -856,7 +856,8 @@ Niivue.prototype.draw2D = function(leftTopWidthHeight, axCorSag) {
 	let isMirrorLR = ((this.isRadiologicalConvention) && (axCorSag < this.sliceTypeSagittal))
 	this.sliceShader.use(this.gl);
 	this.gl.uniform1f(this.sliceShader.uniforms["opacity"], this.backOpacity);
-  this.gl.uniform1f(this.sliceShader.uniforms["overlay_opacity"], this.overlayOpacity);
+  // TODO: set overlay opacity in shader (and blend with brackground so that binary masks don't just show black everywhere when they are the top layer)
+  //this.gl.uniform1f(this.sliceShader.uniforms["overlay_opacity"], this.overlayOpacity);
 	this.gl.uniform1i(this.sliceShader.uniforms["axCorSag"], axCorSag);
 	this.gl.uniform1f(this.sliceShader.uniforms["slice"], crossXYZ[2]);
 	this.gl.uniform2fv(this.sliceShader.uniforms["canvasWidthHeight"], [this.gl.canvas.width, this.gl.canvas.height]);

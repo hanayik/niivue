@@ -175,13 +175,11 @@ precision highp int;
 precision highp float;
 uniform highp sampler3D volume, overlay;
 uniform float opacity;
-uniform float overlay_opacity;
 in vec3 texPos;
 out vec4 color;
-vec4 ocolor;
 void main() {
 	color = vec4(texture(volume, texPos).rgb, opacity);
-	ocolor = vec4(texture(overlay, texPos).rgb, overlay_opacity);
+	vec4 ocolor = texture(overlay, texPos);
 	color.rgb = mix(color.rgb, ocolor.rgb, ocolor.a);
 }`;
 
