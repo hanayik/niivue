@@ -231,12 +231,13 @@ export default {
 
     this.gl = gl;
     
-    //nv.init(this.gl);
-    //this.overlays.forEach((overlay, i) =>  nv.loadVolume(overlay, i))
     this.niivue.loadVolumes(this.overlays); // pass in all overlays (an array)
-    
+   
+    // opacity is an object with properties:
+    // int:   volIdx        The index of the volume being changed in the array of volumes
+    // float: newOpacity    This new Opacity to set for that volume
     bus.$on('opacity-change', (opacity) => {
-      this.niivue.setSliceOpacity(opacity)
+      this.niivue.setOpacity(opacity.volIdx, opacity.newOpacity)
     });
 
     bus.$on('slice-type-change', function (sliceType) {

@@ -69,13 +69,13 @@
               <v-col>
               <p>Opacity</p>
                 <v-slider
-                  v-model="opacity"
+                  v-model="overlay.opacity"
                   step="0.01"
                   max="1"
                   min="0"
                   thumb-label
                   ticks
-                  @input="onOpacityChange(i)"
+                  @input="onOpacityChange(i, overlay.opacity)"
                 >
                 </v-slider>
               </v-col>
@@ -130,8 +130,8 @@ export default {
 
     },
 
-    onOpacityChange: function() {
-      bus.$emit('opacity-change', this.opacity);
+    onOpacityChange: function(i, newOpacity) {
+      bus.$emit('opacity-change', {volIdx:i, newOpacity:newOpacity});
 
     },
 

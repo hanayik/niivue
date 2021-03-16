@@ -58,7 +58,8 @@ export let Niivue = function(opts={}){
   {leftTopWidthHeight: [1, 0, 0, 1], axCorSag: this.sliceTypeAxial},
   {leftTopWidthHeight: [1, 0, 0, 1], axCorSag: this.sliceTypeAxial}
 ];
-  this.sliceOpacity = 1.0
+  this.backOpacity = 1.0
+  this.overlayOpacity = 1.0
 
   // loop through known Niivue properties
   // if the user supplied opts object has a
@@ -131,10 +132,17 @@ Niivue.prototype.setSliceType = function(st) {
   this.drawScene()
 } // setSliceType()
 
-Niivue.prototype.setSliceOpacity = function (op) {
-  this.sliceOpacity = op
+Niivue.prototype.setOpacity = function (volIdx, newOpacity) {
+  console.log(volIdx, newOpacity)
+  if (volIdx === 0){
+    this.backOpacity = newOpacity
+  } else {
+    // temporary: if volIdx is greater than zero, set the overlay opacity (for all overlays)
+    // TODO: use volIdx and newOpacity to set the pre-blended alpha of each loaded overlay
+    this.overlayOpacity = newOpacity
+  }
   this.drawScene()
-} // setSliceOpacity()
+} // setOpacity()
 
 Niivue.prototype.setScale = function (scale) {
   this.volScaleMultiplier = scale
@@ -847,7 +855,8 @@ Niivue.prototype.draw2D = function(leftTopWidthHeight, axCorSag) {
 		crossXYZ = [this.scene.crosshairPos[1], this.scene.crosshairPos[2],this.scene.crosshairPos[0]]; //sagittal: width=j, height=k, slice=i
 	let isMirrorLR = ((this.isRadiologicalConvention) && (axCorSag < this.sliceTypeSagittal))
 	this.sliceShader.use(this.gl);
-	this.gl.uniform1f(this.sliceShader.uniforms["opacity"], this.sliceOpacity);
+	this.gl.uniform1f(this.sliceShader.uniforms["opacity"], this.backOpacity);
+  this.gl.uniform1f(this.sliceShader.uniforms["overlay_opacity"], this.overlayOpacity);
 	this.gl.uniform1i(this.sliceShader.uniforms["axCorSag"], axCorSag);
 	this.gl.uniform1f(this.sliceShader.uniforms["slice"], crossXYZ[2]);
 	this.gl.uniform2fv(this.sliceShader.uniforms["canvasWidthHeight"], [this.gl.canvas.width, this.gl.canvas.height]);
