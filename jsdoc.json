@@ -1,0 +1,14 @@
+{
+  "source": {
+    "include": ["./"],
+    "exclude": ["./node_modules/"],
+    "includePattern": "\\.(vue|js)$"
+  },
+  "plugins": [
+    "node_modules/jsdoc-vuejs"
+  ],
+  "opts": {
+    "destination": "./docs/api-docs/",
+    "recurse": false
+  }
+}
