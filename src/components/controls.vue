@@ -15,7 +15,7 @@
           <v-expansion-panel-header>
             <v-row no-gutters class="align-center">
               <v-icon class="mx-2 drag-handle"> mdi-drag-horizontal-variant </v-icon>
-              <v-icon class="mx-2" @click.stop="toggleEye"> {{ eyeIcon }} </v-icon>{{ overlay.name }}
+              <v-icon class="mx-2" :ref="overlay.name" @click.stop="toggleEye(overlay.name)">mdi-eye</v-icon>{{ overlay.name }}
             </v-row>
             
           </v-expansion-panel-header>
@@ -115,13 +115,22 @@ export default {
       overlays_: this.overlays,
       draggable: true,
       opacity: 1.0,
+      overlayVisibilityState: {},
       
     }
   },
 
   methods: {
-    toggleEye: function() {
-      this.eyeIcon = this.eyeIcon == "mdi-eye" ? "mdi-eye-off" : "mdi-eye"
+    toggleEye: function(overlayname) {
+      if(!(overlayname in this.overlayVisibilityState)) {
+        this.overlayVisibilityState[overlayname] = "mdi-eye";
+      }
+      
+      const newVisibility = this.overlayVisibilityState[overlayname] == "mdi-eye" ? "mdi-eye-off" : "mdi-eye";
+      let className = this.$refs[overlayname][0].$el.className;
+      className = className.replace(` ${this.overlayVisibilityState[overlayname]}`, ` ${newVisibility} `);
+      this.$refs[overlayname][0].$el.className = className;
+      this.overlayVisibilityState[overlayname] = newVisibility;
     },
 
     onColorChange: function(i) {
