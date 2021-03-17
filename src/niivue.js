@@ -454,6 +454,12 @@ Niivue.prototype.initText = async function () {
 // TODO: run init from attachTo
 Niivue.prototype.init = async function () {
 	//initial setup: only at the startup of the component
+  // print debug info (gpu vendor and renderer)
+  let debugInfo = this.gl.getExtension('WEBGL_debug_renderer_info');
+  let vendor = this.gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+  let renderer = this.gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+  console.log("gpu vendor: ", vendor)
+  console.log("gpu renderer: ", renderer)
   this.gl.enable(this.gl.CULL_FACE);
   this.gl.cullFace(this.gl.FRONT);
   this.gl.enable(this.gl.BLEND);
