@@ -508,10 +508,6 @@ Niivue.prototype.init = async function () {
   this.gl.enable(this.gl.BLEND);
   this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
 
-  // register volume and overlay textures
-  this.rgbaTex(this.volumeTexture, this.gl.TEXTURE0, [2,2,2,2], true);
-	this.rgbaTex(this.overlayTexture, this.gl.TEXTURE2, [2,2,2,2], true);
-
   let cubeStrip = [0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0];
 	let vao = this.gl.createVertexArray();
 	this.gl.bindVertexArray(vao);
@@ -558,21 +554,24 @@ Niivue.prototype.init = async function () {
 } // init()
 
 Niivue.prototype.updateGLVolume = function() { //load volume or change contrast
-  let overlay = 0;
+  let visibleLayers = 0;
+
   // loop through loading volumes in this.volume
   for (let i=0; i<this.volumes.length; i++){
-    // i == 0 is probably base layer so load it as such
-    if (i === 0) {
-		if (this.volumes[i].toRAS) // avoid trying to refresh a volume that isn't ready
-			this.refreshLayers(this.volumes[i], 0);
-		else
-			return; //Exit: unable to render overlays until background is loaded!
-    } else {
-      // i > 0 probably not base layer, so set isBaseLayer to false
-      overlay++
-      if (this.volumes[i].toRAS) // avoid trying to refresh a volume that isn't ready
-        this.refreshLayers(this.volumes[i], overlay);
-    }
+	// avoid trying to refresh a volume that isn't ready
+	if(!this.volumes[i].toRAS) {
+		continue;
+	}
+
+	if(this.volumes[i].visible) {
+		this.refreshLayers(this.volumes[i], visibleLayers);
+		visibleLayers++;
+	}
+	else {
+		if(visibleLayers) {
+			this.rgbaTex(this.overlayTexture, this.gl.TEXTURE2, [2,2,2,2], true);
+		}
+	}
   }
 	this.drawScene();
 } // updateVolume()
@@ -1051,55 +1050,62 @@ Niivue.prototype.scaleSlice = function(w, h) {
 Niivue.prototype.drawScene = function() {
 	this.gl.clearColor(this.opts.backColor[0], this.opts.backColor[1], this.opts.backColor[2], this.opts.backColor[3]);
 	this.gl.clear(this.gl.COLOR_BUFFER_BIT);
-	if (this.sliceType === this.sliceTypeRender) //draw rendering
-		return this.draw3D();
-	let {volScale} = this.sliceScale();
-	this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
-	this.numScreenSlices = 0;
-	if (this.sliceType === this.sliceTypeAxial) { //draw axial
-		let leftTopWidthHeight = this.scaleSlice(volScale[0], volScale[1]);
-		this.draw2D(leftTopWidthHeight, 0);
-	} else if (this.sliceType === this.sliceTypeCoronal) { //draw coronal
-		let leftTopWidthHeight = this.scaleSlice(volScale[0], volScale[2]);
-		this.draw2D(leftTopWidthHeight, 1);
-	} else if (this.sliceType === this.sliceTypeSagittal) { //draw sagittal
-		let leftTopWidthHeight = this.scaleSlice(volScale[1], volScale[2]);
-		this.draw2D(leftTopWidthHeight, 2);
-	} else { //sliceTypeMultiplanar
-		let ltwh = this.scaleSlice(volScale[0]+volScale[1], volScale[1]+volScale[2]);
-		let wX = ltwh[2] * volScale[0]/(volScale[0]+volScale[1]);
-		let ltwh3x1 = this.scaleSlice(volScale[0]+volScale[0]+volScale[1], Math.max(volScale[1],volScale[2]));
-		let wX1 = ltwh3x1[2] * volScale[0]/(volScale[0]+volScale[0]+volScale[1]);
-		if (wX1 > wX) {
-			let pixScale = (wX1 / volScale[0]);
-			let hY1 = volScale[1] * pixScale;
-			let hZ1 = volScale[2] * pixScale;
-			//draw axial
-			this.draw2D([ltwh3x1[0],ltwh3x1[1], wX1, hY1], 0);
-			//draw coronal
-			this.draw2D([ltwh3x1[0] + wX1,ltwh3x1[1], wX1, hZ1], 1);
-			//draw sagittal
-			this.draw2D([ltwh3x1[0] + wX1 + wX1,ltwh3x1[1], hY1, hZ1], 2);
+	let posString = '';
 
-		} else {
-			let wY = ltwh[2] - wX;
-			let hY = ltwh[3] * volScale[1]/(volScale[1]+volScale[2]);
-			let hZ = ltwh[3] - hY;
-			//draw axial
-			this.draw2D([ltwh[0],ltwh[1]+hZ, wX, hY], 0);
-			//draw coronal
-			this.draw2D([ltwh[0],ltwh[1], wX, hZ], 1);
-			//draw sagittal
-			this.draw2D([ltwh[0]+wX,ltwh[1], wY, hZ], 2);
-			//draw colorbar (optional) // TODO currently only drawing one colorbar, there may be one per overlay + one for the background
-			var margin = this.opts.colorBarMargin * hY;
-			this.drawColorbar([ltwh[0]+wX+margin, ltwh[1] + hZ + margin, wY - margin - margin, hY * this.opts.colorbarHeight]);
-			// drawTextBelow(gl, [ltwh[0]+ wX + (wY * 0.5), ltwh[1] + hZ + margin + hY * colorbarHeight], "Syzygy"); //DEMO
+	// check if we have anything to draw
+	if(this.back.dims) {
+		if (this.sliceType === this.sliceTypeRender) //draw rendering
+			return this.draw3D();
+		let {volScale} = this.sliceScale();
+		this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
+		this.numScreenSlices = 0;
+		if (this.sliceType === this.sliceTypeAxial) { //draw axial
+			let leftTopWidthHeight = this.scaleSlice(volScale[0], volScale[1]);
+			this.draw2D(leftTopWidthHeight, 0);
+		} else if (this.sliceType === this.sliceTypeCoronal) { //draw coronal
+			let leftTopWidthHeight = this.scaleSlice(volScale[0], volScale[2]);
+			this.draw2D(leftTopWidthHeight, 1);
+		} else if (this.sliceType === this.sliceTypeSagittal) { //draw sagittal
+			let leftTopWidthHeight = this.scaleSlice(volScale[1], volScale[2]);
+			this.draw2D(leftTopWidthHeight, 2);
+		} else { //sliceTypeMultiplanar
+			let ltwh = this.scaleSlice(volScale[0]+volScale[1], volScale[1]+volScale[2]);
+			let wX = ltwh[2] * volScale[0]/(volScale[0]+volScale[1]);
+			let ltwh3x1 = this.scaleSlice(volScale[0]+volScale[0]+volScale[1], Math.max(volScale[1],volScale[2]));
+			let wX1 = ltwh3x1[2] * volScale[0]/(volScale[0]+volScale[0]+volScale[1]);
+			if (wX1 > wX) {
+				let pixScale = (wX1 / volScale[0]);
+				let hY1 = volScale[1] * pixScale;
+				let hZ1 = volScale[2] * pixScale;
+				//draw axial
+				this.draw2D([ltwh3x1[0],ltwh3x1[1], wX1, hY1], 0);
+				//draw coronal
+				this.draw2D([ltwh3x1[0] + wX1,ltwh3x1[1], wX1, hZ1], 1);
+				//draw sagittal
+				this.draw2D([ltwh3x1[0] + wX1 + wX1,ltwh3x1[1], hY1, hZ1], 2);
+
+			} else {
+				let wY = ltwh[2] - wX;
+				let hY = ltwh[3] * volScale[1]/(volScale[1]+volScale[2]);
+				let hZ = ltwh[3] - hY;
+				//draw axial
+				this.draw2D([ltwh[0],ltwh[1]+hZ, wX, hY], 0);
+				//draw coronal
+				this.draw2D([ltwh[0],ltwh[1], wX, hZ], 1);
+				//draw sagittal
+				this.draw2D([ltwh[0]+wX,ltwh[1], wY, hZ], 2);
+				//draw colorbar (optional) // TODO currently only drawing one colorbar, there may be one per overlay + one for the background
+				var margin = this.opts.colorBarMargin * hY;
+				this.drawColorbar([ltwh[0]+wX+margin, ltwh[1] + hZ + margin, wY - margin - margin, hY * this.opts.colorbarHeight]);
+				// drawTextBelow(gl, [ltwh[0]+ wX + (wY * 0.5), ltwh[1] + hZ + margin + hY * colorbarHeight], "Syzygy"); //DEMO
+			}
 		}
+
+		const pos = this.frac2mm([this.scene.crosshairPos[0],this.scene.crosshairPos[1],this.scene.crosshairPos[2]]);
+		posString = pos[0].toFixed(2)+'×'+pos[1].toFixed(2)+'×'+pos[2].toFixed(2);
 	}
 	this.gl.finish();
-	let pos = this.frac2mm([this.scene.crosshairPos[0],this.scene.crosshairPos[1],this.scene.crosshairPos[2]]);
-	let posString = pos[0].toFixed(2)+'×'+pos[1].toFixed(2)+'×'+pos[2].toFixed(2);
+	
 	// temporary event bus mechanism. It uses Vue, but it would be ideal to divorce vue from this gl code.
 	//bus.$emit('crosshair-pos-change', posString);
 	return posString
