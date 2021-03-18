@@ -23,8 +23,9 @@ The goal is to have a simple viewer component that can be embedded in an existin
  
 ## Contributors
 
-- Taylor Hanayik
-- Chris Rorden
+- [Taylor Hanayik](https://github.com/hanayik)
+- [Chris Rorden](https://github.com/neurolabusc)
+- [Christopher Drake](https://github.com/cdrake)
 
 ## Alternatives
 
