@@ -1,4 +1,32 @@
-import * as nii from "nifti-reader-js"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: niivue.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: niivue.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import * as nii from "nifti-reader-js"
 import { Shader } from "./webgl-util/shader.js";
 import * as mat from "gl-matrix";
 import { vertSliceShader, fragSliceShader } from "./shader-srcs.js";
@@ -100,7 +128,7 @@ export let Niivue = function(opts={}){
   // loop through known Niivue properties
   // if the user supplied opts object has a
   // property listed in the known properties, then set
-  // Niivue.opts.<prop> to that value, else apply defaults.
+  // Niivue.opts.&lt;prop> to that value, else apply defaults.
   for (let prop in this.defaults) {
     this.opts[prop] = (opts[prop] === undefined) ? this.defaults[prop] : opts[prop]
   }
@@ -113,9 +141,9 @@ export let Niivue = function(opts={}){
  * @example Niivue.arrayEquals(a, b)
  */
 Niivue.prototype.arrayEquals = function(a, b) {
-  return Array.isArray(a) &&
-    Array.isArray(b) &&
-    a.length === b.length &&
+  return Array.isArray(a) &amp;&amp;
+    Array.isArray(b) &amp;&amp;
+    a.length === b.length &amp;&amp;
     a.every((val, index) => val === b[index]);
 }
 
@@ -141,7 +169,7 @@ Niivue.prototype.sph2cartDeg = function sph2cartDeg(azimuth, elevation) {
  let Theta = ((azimuth-90) % 360) * (Math.PI/180);
  let ret = [Math.cos(Phi)* Math.cos(Theta), Math.cos(Phi) * Math.sin(Theta), Math.sin(Phi) ];
  let len = Math.sqrt(ret[0] * ret[0] + ret[1] * ret[1] + ret[2] * ret[2] );
- if (len <= 0.0) return ret;
+ if (len &lt;= 0.0) return ret;
  ret[0] /= len;
  ret[1] /= len;
  ret[2] /= len;
@@ -211,7 +239,7 @@ Niivue.prototype.scaleTo8Bit = function (A, volume) {
 	var scale = 1;
 	var i
 	if (mx > mn) scale = 255 / (mx - mn);
-	for (i = 0; i < (vox - 1); i++) {
+	for (i = 0; i &lt; (vox - 1); i++) {
 		var v = A[i];
 		v = (v * volume.hdr.scl_slope) + volume.hdr.scl_inter;
 		img8[i] = (v - mn) * scale;
@@ -228,15 +256,15 @@ Niivue.prototype.overlayRGBA = function (volume) {
 	let halfY = 0.5 * hdr.dims[2];
 	let halfZ = 0.5 * hdr.dims[3];
 	let j = 0;
-	for (let z = 0; z < hdr.dims[3]; z++) {
-		for (let y = 0; y < hdr.dims[2]; y++) {
-			for (let x = 0; x < hdr.dims[1]; x++) {
+	for (let z = 0; z &lt; hdr.dims[3]; z++) {
+		for (let y = 0; y &lt; hdr.dims[2]; y++) {
+			for (let x = 0; x &lt; hdr.dims[1]; x++) {
 				let dx = (Math.abs(x - halfX));
 				let dy = (Math.abs(y - halfY));
 				let dz = (Math.abs(z - halfZ));
 				let dist = Math.sqrt(dx*dx + dy*dy + dz * dz);
 				let v = 0;
-				if (dist < radius) v = 255;
+				if (dist &lt; radius) v = 255;
 				imgRGBA[j++] = 0; //Red
 				imgRGBA[j++] = v; //Green
 				imgRGBA[j++] = 0; //Blue
@@ -254,13 +282,13 @@ Niivue.prototype.calibrateIntensity = function(A, volume) {
 	var mn = Infinity;
 	var mx = -Infinity;
 	var i
-	for (i = 0; i < (vox - 1); i++) {
+	for (i = 0; i &lt; (vox - 1); i++) {
 		if (!isFinite(A[i])) continue;
-		if (A[i] < mn) mn = A[i];
+		if (A[i] &lt; mn) mn = A[i];
 		if (A[i] > mx) mx = A[i];
 	}
 	//calibrate intensity
-	if ((isFinite(volume.hdr.scl_slope)) && (isFinite(volume.hdr.scl_inter)) && (volume.hdr.scl_slope !== 0.0)) {
+	if ((isFinite(volume.hdr.scl_slope)) &amp;&amp; (isFinite(volume.hdr.scl_inter)) &amp;&amp; (volume.hdr.scl_slope !== 0.0)) {
 		//console.log(">> mn %f mx %f %f %f", mn, mx, hdr.scl_slope, hdr.scl_inter);
 		mn = (mn * volume.hdr.scl_slope) + volume.hdr.scl_inter;
 		mx = (mx * volume.hdr.scl_slope) + volume.hdr.scl_inter;
@@ -297,7 +325,7 @@ let hdr = overlayItem.volume.hdr;
 	//1st column = x
 	let ixyz = [1, 1, 1];
     if (absR[3] > absR[0]) ixyz[0] = 2;//(absR[1][0] > absR[0][0]) ixyz[0] = 2;
-    if ((absR[6] > absR[0]) && (absR[6]> absR[3])) ixyz[0] = 3;//((absR[2][0] > absR[0][0]) && (absR[2][0]> absR[1][0])) ixyz[0] = 3;
+    if ((absR[6] > absR[0]) &amp;&amp; (absR[6]> absR[3])) ixyz[0] = 3;//((absR[2][0] > absR[0][0]) &amp;&amp; (absR[2][0]> absR[1][0])) ixyz[0] = 3;
 	//2nd column = y
 	ixyz[1] = 1;
     if (ixyz[0] === 1) {
@@ -330,16 +358,16 @@ let hdr = overlayItem.volume.hdr;
 	overlayItem.mm001 = this.vox2mm([-0.5, -0.5, hdr.dims[3]-0.5], rotM);
 	let R = mat.mat4.create();
 	mat.mat4.copy(R, rotM);
-	for (let i = 0; i < 3; i++)
-		for (let j = 0; j < 3; j++)
+	for (let i = 0; i &lt; 3; i++)
+		for (let j = 0; j &lt; 3; j++)
 			R[(i*4)+j] =  rotM[(i*4)+perm[j]-1] ;//rotM[i+(4*(perm[j]-1))];//rotM[i],[perm[j]-1];
 	let flip = [0, 0, 0];
-    if (R[0] < 0) flip[0] = 1; //R[0][0]
-    if (R[5] < 0) flip[1] = 1; //R[1][1]
-    if (R[10] < 0) flip[2] = 1; //R[2][2]
+    if (R[0] &lt; 0) flip[0] = 1; //R[0][0]
+    if (R[5] &lt; 0) flip[1] = 1; //R[1][1]
+    if (R[10] &lt; 0) flip[2] = 1; //R[2][2]
 	overlayItem.dimsRAS = [hdr.dims[0], hdr.dims[perm[0]], hdr.dims[perm[1]], hdr.dims[perm[2]]];
 	overlayItem.pixDimsRAS = [hdr.pixDims[0], hdr.pixDims[perm[0]], hdr.pixDims[perm[1]], hdr.pixDims[perm[2]]];
-	if (this.arrayEquals(perm, [1,2,3]) && this.arrayEquals(flip, [0,0,0])) {
+	if (this.arrayEquals(perm, [1,2,3]) &amp;&amp; this.arrayEquals(flip, [0,0,0])) {
 		overlayItem.toRAS = mat.mat4.create(); //aka fromValues(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1);
 		overlayItem.matRAS = mat.mat4.clone(rotM);
 		return; //no rotation required!
@@ -374,7 +402,7 @@ Niivue.prototype.loadVolumes  = function(volumeList) {
   let hdr = null
   let img = null
   // for loop to load all volumes in volumeList
-  for (let i=0; i<volumeList.length; i++){
+  for (let i=0; i&lt;volumeList.length; i++){
     console.log("loading ", volumeList[i].url)
     let url = this.volumes[i].url
     xhr.push(new XMLHttpRequest());
@@ -457,7 +485,7 @@ Niivue.prototype.initText = async function () {
 	await this.loadPng('fnt.png');
 	//create font metrics
 	this.fontMets = [];
-	for (let id = 0; id < 256; id++) { //clear ASCII codes 0..256
+	for (let id = 0; id &lt; 256; id++) { //clear ASCII codes 0..256
 		this.fontMets[id] = {};
 		this.fontMets[id].xadv = 0;
 		this.fontMets[id].uv_lbwh = [0, 0, 0, 0];
@@ -474,7 +502,7 @@ Niivue.prototype.initText = async function () {
 	this.fontMets.size = metrics.atlas.size;
 	let scaleW = metrics.atlas.width;
 	let scaleH = metrics.atlas.height;
-	for (let i = 0; i < metrics.glyphs.length; i++) {
+	for (let i = 0; i &lt; metrics.glyphs.length; i++) {
 		let glyph = metrics.glyphs[i];
 		let id = glyph.unicode;
 		this.fontMets[id].xadv = glyph.advance;
@@ -557,11 +585,11 @@ Niivue.prototype.init = async function () {
 
 Niivue.prototype.updateGLVolume = function(overlayItem) { //load volume or change contrast
   //this.refreshLayers(overlayItem, true);
-	//this.refreshLayers(overlayItem, false); //<- _DEMO load overlay
+	//this.refreshLayers(overlayItem, false); //&lt;- _DEMO load overlay
   console.log('todo', overlayItem) // avoid unused variable error for now (can prob remove overlayItem TODO)
   let isBaseLayer = true
   // loop through loading volumes in this.volumes
-  for (let i=0; i<this.volumes.length; i++){
+  for (let i=0; i&lt;this.volumes.length; i++){
     // i == 0 is probably base layer so load it as such
     if (i === 0) {
 		if (this.volumes[i].toRAS) // avoid trying to refresh a volume that isn't ready
@@ -580,13 +608,13 @@ Niivue.prototype.updateGLVolume = function(overlayItem) { //load volume or chang
 
 // given an overlayItem and its img TypedArray, calculate 2% and 98% display range if needed
 Niivue.prototype.calMinMax = function(overlayItem, img){
-  if (overlayItem.volume.hdr.cal_min !== 0 && overlayItem.volume.hdr.cal_max !== 0){
+  if (overlayItem.volume.hdr.cal_min !== 0 &amp;&amp; overlayItem.volume.hdr.cal_max !== 0){
     console.log("not setting the calmin and max")
     return
   }
   let mn=0
   let mx=0
-  for (let i=0; i<img.length; i++){
+  for (let i=0; i&lt;img.length; i++){
     mn = Math.min(img[i],mn)
     mx = Math.max(img[i],mx)
   }
@@ -688,7 +716,7 @@ Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
 	this.gl.uniform1f(orientShader.uniforms["scl_inter"], hdr.scl_inter);
 	this.gl.uniform1f(orientShader.uniforms["scl_slope"],hdr.scl_slope);
 	this.gl.uniformMatrix4fv(orientShader.uniforms["mtx"], false, mtx)
-	for (let i = 0; i < (this.back.dims[3]); i++) { //output slices
+	for (let i = 0; i &lt; (this.back.dims[3]); i++) { //output slices
 		var coordZ = 1/this.back.dims[3] * (i + 0.5);
 		this.gl.uniform1f(orientShader.uniforms["coordZ"], coordZ);
 		this.gl.framebufferTextureLayer(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, outTexture, 0, i);
@@ -730,13 +758,13 @@ Niivue.prototype.makeLut = function(Rs, Gs, Bs, As, Is) {
 	//intensity indices should be in increasing order with the first value 0 and the last 255.
 	// this.makeLut([0, 255], [0, 0], [0,0], [0,128],[0,255]); //red gradient
 	var lut = new Uint8ClampedArray(256 * 4);
-	for (var i = 0; i < (Is.length - 1); i++) {
+	for (var i = 0; i &lt; (Is.length - 1); i++) {
 		//return a + f * (b - a);
 		var idxLo = Is[i];
 		var idxHi = Is[i + 1];
 		var idxRng = idxHi - idxLo;
 		var k = idxLo * 4;
-		for (var j = idxLo; j <= idxHi; j++) {
+		for (var j = idxLo; j &lt;= idxHi; j++) {
 			var f = (j - idxLo) / idxRng;
       lut[k++] = Rs[i] + f * (Rs[i + 1] - Rs[i]); //Red
 			lut[k++] = Gs[i] + f * (Gs[i + 1] - Gs[i]); //Green
@@ -763,18 +791,18 @@ Niivue.prototype.mouseClick = function(x, y, posChange=0, isDelta=true) {
   if (this.sliceType === this.sliceTypeRender)
 		return
 	//console.log("Click pixels (x,y):", x, y);
-	if ((this.numScreenSlices < 1) || (this.gl.canvas.height < 1) || (this.gl.canvas.width < 1))
+	if ((this.numScreenSlices &lt; 1) || (this.gl.canvas.height &lt; 1) || (this.gl.canvas.width &lt; 1))
 		return;
 	//mouse click X,Y in screen coordinates, origin at top left
 	// webGL clip space L,R,T,B = [-1, 1, 1, 1]
 	// n.b. webGL Y polarity reversed
 	// https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html
-	for (let i = 0; i < this.numScreenSlices; i++) {
+	for (let i = 0; i &lt; this.numScreenSlices; i++) {
 		var axCorSag = this.screenSlices[i].axCorSag;
 		if (axCorSag > this.sliceTypeSagittal) continue;
 		var ltwh = this.screenSlices[i].leftTopWidthHeight;
 		let isMirror = false;
-		if (ltwh[2] < 0) {
+		if (ltwh[2] &lt; 0) {
 			isMirror = true;
 			ltwh[0] += ltwh[2];
 			ltwh[2] = - ltwh[2];
@@ -782,7 +810,7 @@ Niivue.prototype.mouseClick = function(x, y, posChange=0, isDelta=true) {
 		var fracX = (x - ltwh[0]) / ltwh[2];
 		if (isMirror) fracX = 1.0 - fracX;
 		var fracY = 1.0 - ((y - ltwh[1]) / ltwh[3]);
-		if ((fracX >= 0.0) && (fracX < 1.0) && (fracY >= 0.0) && (fracY < 1.0)) { //user clicked on slice i
+		if ((fracX >= 0.0) &amp;&amp; (fracX &lt; 1.0) &amp;&amp; (fracY >= 0.0) &amp;&amp; (fracY &lt; 1.0)) { //user clicked on slice i
 			if ( !isDelta ) {
 				this.scene.crosshairPos[2 - axCorSag] = posChange;
 				this.drawScene();
@@ -792,7 +820,7 @@ Niivue.prototype.mouseClick = function(x, y, posChange=0, isDelta=true) {
 				posNow = this.scene.crosshairPos[2 - axCorSag]
 				posFuture = posNow + posChange
 				if (posFuture > 1) posFuture = 1;
-				if (posFuture < 0) posFuture = 0;
+				if (posFuture &lt; 0) posFuture = 0;
 				//console.log(scrollVal,':',axCorSag, '>>', posFuture);
 				this.scene.crosshairPos[2 - axCorSag] = posFuture;
 				this.drawScene()
@@ -814,7 +842,7 @@ Niivue.prototype.mouseClick = function(x, y, posChange=0, isDelta=true) {
 			return;
 		} else {//if click in slice i
       // if x and y are null, likely due to a slider widget sending the posChange (no mouse info in that case)
-      if (x === null && y === null){
+      if (x === null &amp;&amp; y === null){
         this.scene.crosshairPos[2-axCorSag] = posChange
         this.drawScene()
         return
@@ -824,7 +852,7 @@ Niivue.prototype.mouseClick = function(x, y, posChange=0, isDelta=true) {
 } // mouseClick()
 
 Niivue.prototype.drawColorbar = function(leftTopWidthHeight) {
-	if ((leftTopWidthHeight[2] <= 0) || (leftTopWidthHeight[3] <= 0))
+	if ((leftTopWidthHeight[2] &lt;= 0) || (leftTopWidthHeight[3] &lt;= 0))
 		return;
 	//console.log("bar:", leftTopWidthHeight[0], leftTopWidthHeight[1], leftTopWidthHeight[2], leftTopWidthHeight[3]);
 	if (this.opts.crosshairWidth > 0) {
@@ -846,7 +874,7 @@ Niivue.prototype.drawColorbar = function(leftTopWidthHeight) {
 Niivue.prototype.textWidth = function(scale, str) {
 	let w = 0;
 	var bytes = new Buffer(str);
-	for (let i = 0; i < str.length; i++)
+	for (let i = 0; i &lt; str.length; i++)
 		w += scale * this.fontMets[bytes[i]].xadv;
 	return w;
 } // textWidth()
@@ -865,7 +893,7 @@ Niivue.prototype.drawChar = function(xy, scale, char) { //draw single character,
 } // drawChar()
 
 Niivue.prototype.drawText = function(xy, str) { //to right of x, vertically centered on y
-	if (this.opts.textHeight <= 0) return;
+	if (this.opts.textHeight &lt;= 0) return;
 	this.fontShader.use(this.gl);
 	let scale = (this.opts.textHeight * this.gl.canvas.height);
   this.gl.enable(this.gl.BLEND)
@@ -875,19 +903,19 @@ Niivue.prototype.drawText = function(xy, str) { //to right of x, vertically cent
 	screenPxRange = Math.max(screenPxRange, 1.0) //screenPxRange() must never be lower than 1
 	this.gl.uniform1f(this.fontShader.uniforms["screenPxRange"], screenPxRange);
 	var bytes = new Buffer(str);
-	for (let i = 0; i < str.length; i++)
+	for (let i = 0; i &lt; str.length; i++)
 		xy[0] += this.drawChar(xy, scale, bytes[i]);
 } // drawText()
 
 Niivue.prototype.drawTextRight = function(xy, str) { //to right of x, vertically centered on y
-	if (this.opts.textHeight <= 0) return;
+	if (this.opts.textHeight &lt;= 0) return;
 	this.fontShader.use(this.gl)
 	xy[1] -= (0.5 * this.opts.textHeight * this.gl.canvas.height);
 	this.drawText(xy, str)
 } // drawTextRight()
 
 Niivue.prototype.drawTextBelow = function(xy, str) { //horizontally centered on x, below y
-	if (this.opts.textHeight <= 0) return;
+	if (this.opts.textHeight &lt;= 0) return;
 	this.fontShader.use(this.gl)
 	let scale = (this.opts.textHeight * this.gl.canvas.height);
 	xy[0] -= 0.5 * this.textWidth(scale, str);
@@ -900,7 +928,7 @@ Niivue.prototype.draw2D = function(leftTopWidthHeight, axCorSag) {
 		crossXYZ = [this.scene.crosshairPos[0], this.scene.crosshairPos[2],this.scene.crosshairPos[1]]; //coronal: width=i, height=k, slice=j
 	if (axCorSag === this.sliceTypeSagittal)
 		crossXYZ = [this.scene.crosshairPos[1], this.scene.crosshairPos[2],this.scene.crosshairPos[0]]; //sagittal: width=j, height=k, slice=i
-	let isMirrorLR = ((this.isRadiologicalConvention) && (axCorSag < this.sliceTypeSagittal))
+	let isMirrorLR = ((this.isRadiologicalConvention) &amp;&amp; (axCorSag &lt; this.sliceTypeSagittal))
 	this.sliceShader.use(this.gl);
 	this.gl.uniform1f(this.sliceShader.uniforms["opacity"], this.backOpacity);
   // TODO: set overlay opacity in shader (and blend with brackground so that binary masks don't just show black everywhere when they are the top layer)
@@ -922,7 +950,7 @@ Niivue.prototype.draw2D = function(leftTopWidthHeight, axCorSag) {
 	this.screenSlices[this.numScreenSlices].leftTopWidthHeight = leftTopWidthHeight;
 	this.screenSlices[this.numScreenSlices].axCorSag = axCorSag;
 	this.numScreenSlices += 1;
-	if (this.opts.crosshairWidth <= 0.0) return;
+	if (this.opts.crosshairWidth &lt;= 0.0) return;
 	this.lineShader.use(this.gl)
 	this.gl.uniform4fv(this.lineShader.uniforms["lineColor"], this.opts.crosshairColor);
 	this.gl.uniform2fv(this.lineShader.uniforms["canvasWidthHeight"], [this.gl.canvas.width, this.gl.canvas.height]);
@@ -937,7 +965,7 @@ Niivue.prototype.draw2D = function(leftTopWidthHeight, axCorSag) {
 	this.gl.enable(this.gl.CULL_FACE);
 	if (isMirrorLR)
 		this.drawTextRight([leftTopWidthHeight[0] +leftTopWidthHeight[2] + 1, leftTopWidthHeight[1] + (0.5 * leftTopWidthHeight[3]) ], "R");
-	else if (axCorSag < this.sliceTypeSagittal)
+	else if (axCorSag &lt; this.sliceTypeSagittal)
 		this.drawTextRight([leftTopWidthHeight[0] + 1, leftTopWidthHeight[1] + (0.5 * leftTopWidthHeight[3]) ], "L");
 	if ( axCorSag === this.sliceTypeAxial)
 		this.drawTextBelow([leftTopWidthHeight[0] + (0.5 * leftTopWidthHeight[2]), leftTopWidthHeight[1] + 1 ], "A");
@@ -948,7 +976,7 @@ Niivue.prototype.draw2D = function(leftTopWidthHeight, axCorSag) {
 Niivue.prototype.draw3D = function() {
 	let {volScale, vox} = this.sliceScale(); // slice scale determined by this.back --> the base image layer
 	this.renderShader.use(this.gl);
-	if (this.gl.canvas.width < this.gl.canvas.height) // screen aspect ratio
+	if (this.gl.canvas.width &lt; this.gl.canvas.height) // screen aspect ratio
 		this.gl.viewport(0, (this.gl.canvas.height - this.gl.canvas.width)* 0.5, this.gl.canvas.width, this.gl.canvas.width);
 	else
 		this.gl.viewport((this.gl.canvas.width - this.gl.canvas.height)* 0.5, 0, this.gl.canvas.height, this.gl.canvas.height);
@@ -972,9 +1000,9 @@ Niivue.prototype.draw3D = function() {
 	mat.vec3.normalize(rayDir, rayDir);
 	//defuzz, avoid divide by zero
 	const tiny = 0.00001;
-	if (Math.abs(rayDir[0]) < tiny) rayDir[0] = tiny;
-	if (Math.abs(rayDir[1]) < tiny) rayDir[1] = tiny;
-	if (Math.abs(rayDir[2]) < tiny) rayDir[2] = tiny;
+	if (Math.abs(rayDir[0]) &lt; tiny) rayDir[0] = tiny;
+	if (Math.abs(rayDir[1]) &lt; tiny) rayDir[1] = tiny;
+	if (Math.abs(rayDir[2]) &lt; tiny) rayDir[2] = tiny;
 	//console.log( ">>", renderAzimuth, " : ", renderElevation, ">>>> ", rayDir);
 	//gl.disable(gl.DEPTH_TEST);
 	//gl.enable(gl.CULL_FACE);
@@ -996,7 +1024,7 @@ Niivue.prototype.mm2frac = function(mm ) {
 	let mm4 = mat.vec4.fromValues( mm[0], mm[1], mm[2],1);
 	let d = this.back.dims;
 	let frac = [0, 0, 0];
-	if ((d[1] < 1) || (d[2] < 1) || (d[3] < 1))
+	if ((d[1] &lt; 1) || (d[2] &lt; 1) || (d[3] &lt; 1))
 		return frac;
 	let sform = mat.mat4.clone(this.back.matRAS);
 	mat.mat4.transpose(sform, sform);
@@ -1103,3 +1131,26 @@ bus.$on('colormap-change', function (selectedColorMap) {
 */
 
 
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Niivue.html">Niivue</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Wed Mar 17 2021 11:17:48 GMT+0000 (Greenwich Mean Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
