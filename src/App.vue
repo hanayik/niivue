@@ -155,9 +155,9 @@ export default {
           opacity: 100,
         },
         {
-          url: "./IPL.nii.gz", //"./hippo.nii.gz",
+          url: "./hippo.nii.gz",
           volume: {hdr: null, img: null},
-          name: "IPL.nii.gz",
+          name: "hippo.nii.gz",
           intensityMin: 0, // not used yet
           intensityMax: 100, // not used yet
           intensityRange:[0, 100], // not used yet
@@ -167,7 +167,6 @@ export default {
       ]
     }
   },
-
   computed: {
     urlOverlayList: function(){
       let vols = []

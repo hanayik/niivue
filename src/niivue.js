@@ -84,6 +84,7 @@ export let Niivue = function(opts={}){
   this.back = {} // base layer; defines image space to work in. Defined as this.volumes[0] in Niivue.loadVolumes
   this.overlays = [] // layers added on top of base image (e.g. masks or stat maps). Essentially everything after this.volumes[0] is an overlay. So is this necessary?
   this.volumes = [] // all loaded images. Can add in the ability to push or slice as needed
+  this.backTexture = [];
   this.isRadiologicalConvention = false
   this.volScaleMultiplier = 1
   this.mousePos = [0, 0]
@@ -95,8 +96,6 @@ export let Niivue = function(opts={}){
   {leftTopWidthHeight: [1, 0, 0, 1], axCorSag: this.sliceTypeAxial}
 ];
   this.backOpacity = 1.0
-  this.overlayOpacity = 1.0
-
   // loop through known Niivue properties
   // if the user supplied opts object has a
   // property listed in the known properties, then set
@@ -174,15 +173,15 @@ Niivue.prototype.setSliceType = function(st) {
 } // setSliceType()
 
 Niivue.prototype.setOpacity = function (volIdx, newOpacity) {
-  console.log(volIdx, newOpacity)
-  if (volIdx === 0){
+  this.volumes[volIdx].opacity = newOpacity
+  if (volIdx === 0){ //background layer opacity set dynamically with shader
     this.backOpacity = newOpacity
-  } else {
-    // temporary: if volIdx is greater than zero, set the overlay opacity (for all overlays)
-    // TODO: use volIdx and newOpacity to set the pre-blended alpha of each loaded overlay
-    this.overlayOpacity = newOpacity
+    this.drawScene()
+    return
   }
-  this.drawScene()
+  //all overlays are combined as a single texture, so changing opacity to one requires us to refresh textures
+  this.updateGLVolume()
+  //
 } // setOpacity()
 
 Niivue.prototype.setScale = function (scale) {
@@ -196,6 +195,8 @@ Niivue.prototype.attachTo = function (id) {
 	this.gl = document.querySelector(id).getContext("webgl2");
 	if (!this.gl){
     alert("unable to get webgl2 context. Perhaps this browser does not support webgl2")
+    console.log("unable to get webgl2 context. Perhaps this browser does not support webgl2")
+
   }
   this.init()
   return this
@@ -382,6 +383,7 @@ Niivue.prototype.loadVolumes  = function(volumeList) {
     xhr[i].responseType = "arraybuffer";
     xhr[i].onerror = function () {
       console.error("error loading volume ", this.volumes[i].url)
+      alert("error loading " + this.volumes[i].url)
     }
     xhr[i].onload = function () {
       let dataBuffer = xhr[i].response;
@@ -401,10 +403,11 @@ Niivue.prototype.loadVolumes  = function(volumeList) {
       this.volumes[i].volume = {}
       this.volumes[i].volume.hdr = hdr
       this.volumes[i].volume.img = img
+      this.volumes[i].opacity = 1;
       this.nii2RAS(this.volumes[i])
       //_overlayItem = overlayItem
       this.selectColormap(this.volumes[0].colorMap) //only base image for now
-      this.updateGLVolume(this.volumes[0])
+      this.updateGLVolume()
     }.bind(this) // bind "this" niivue instance context
     xhr[i].send();
   } // for
@@ -492,7 +495,6 @@ Niivue.prototype.initText = async function () {
 	}
 } // initText()
 
-// TODO: run init from attachTo
 Niivue.prototype.init = async function () {
 	//initial setup: only at the startup of the component
   // print debug info (gpu vendor and renderer)
@@ -555,31 +557,28 @@ Niivue.prototype.init = async function () {
   return this
 } // init()
 
-Niivue.prototype.updateGLVolume = function(overlayItem) { //load volume or change contrast
-  //this.refreshLayers(overlayItem, true);
-	//this.refreshLayers(overlayItem, false); //<- _DEMO load overlay
-  console.log('todo', overlayItem) // avoid unused variable error for now (can prob remove overlayItem TODO)
-  let isBaseLayer = true
-  // loop through loading volumes in this.volumes
+Niivue.prototype.updateGLVolume = function() { //load volume or change contrast
+  let overlay = 0;
+  // loop through loading volumes in this.volume
   for (let i=0; i<this.volumes.length; i++){
     // i == 0 is probably base layer so load it as such
     if (i === 0) {
 		if (this.volumes[i].toRAS) // avoid trying to refresh a volume that isn't ready
-			this.refreshLayers(this.volumes[i], isBaseLayer);
+			this.refreshLayers(this.volumes[i], 0);
 		else
 			return; //Exit: unable to render overlays until background is loaded!
     } else {
       // i > 0 probably not base layer, so set isBaseLayer to false
-      isBaseLayer = false
+      overlay++
       if (this.volumes[i].toRAS) // avoid trying to refresh a volume that isn't ready
-        this.refreshLayers(this.volumes[i], isBaseLayer);
+        this.refreshLayers(this.volumes[i], overlay);
     }
   }
-	this.drawScene(); // TODO: drawScene should draw all volumes and overlays (kinda does now I guess)
+	this.drawScene();
 } // updateVolume()
 
 // given an overlayItem and its img TypedArray, calculate 2% and 98% display range if needed
-Niivue.prototype.calMinMax = function(overlayItem, img){
+Niivue.prototype.calMinMax = function(overlayItem, img, lop=0.02, hip=0.98){
   if (overlayItem.volume.hdr.cal_min !== 0 && overlayItem.volume.hdr.cal_max !== 0){
     console.log("not setting the calmin and max")
     return
@@ -590,23 +589,24 @@ Niivue.prototype.calMinMax = function(overlayItem, img){
     mn = Math.min(img[i],mn)
     mx = Math.max(img[i],mx)
   }
-  let p02 = mx*0.02
-  let p98 = mx*0.98
-  overlayItem.volume.hdr.cal_min = p02
-  overlayItem.volume.hdr.cal_max = p98
+  let p1 = mx*lop
+  let p2 = mx*hip
+  overlayItem.volume.hdr.cal_min = p1
+  overlayItem.volume.hdr.cal_max = p2
   // returns nothing, modifies overlayItem in place
 }
 
-Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
-
+Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	let hdr = overlayItem.volume.hdr
 	let img = overlayItem.volume.img
-  let imgRaw
+	let opacity = overlayItem.opacity
+	let imgRaw
 	let outTexture = [];
 	let mtx = [];
-	if (isBackground) {
+	if (layer === 0) {
 		this.back = {};
 		mtx = overlayItem.toRAS;
+		opacity = 1.0;
 		this.back.matRAS = overlayItem.matRAS;
 		this.back.dims = overlayItem.dimsRAS;
 		this.back.pixDims = overlayItem.pixDimsRAS;
@@ -629,8 +629,12 @@ Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
 			0,0,0,1);
 		mat.mat4.invert(mtx, mtx);
 		//console.log('v2', mtx);
-		outTexture = this.rgbaTex(this.overlayTexture, this.gl.TEXTURE2, this.back.dims);
-  }
+		if (layer === 1) {
+			outTexture = this.rgbaTex(this.overlayTexture, this.gl.TEXTURE2, this.back.dims);
+			this.backTexture = outTexture;
+		} else
+			outTexture = this.backTexture;
+	}
 	let fb = this.gl.createFramebuffer();
 	this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fb);
 	this.gl.disable(this.gl.CULL_FACE);
@@ -677,7 +681,6 @@ Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
 
   // set display cal_min, cal_max display range if required
   this.calMinMax(overlayItem, imgRaw)
-
 	orientShader.use(this.gl);
 	this.selectColormap(overlayItem.colorMap)
 	this.gl.uniform1f(orientShader.uniforms["cal_min"], hdr.cal_min);
@@ -687,12 +690,22 @@ Niivue.prototype.refreshLayers = function(overlayItem, isBackground = true) {
 	this.gl.uniform1i(orientShader.uniforms["colormap"], 1);
 	this.gl.uniform1f(orientShader.uniforms["scl_inter"], hdr.scl_inter);
 	this.gl.uniform1f(orientShader.uniforms["scl_slope"],hdr.scl_slope);
+	this.gl.uniform1f(orientShader.uniforms["opacity"], opacity);
 	this.gl.uniformMatrix4fv(orientShader.uniforms["mtx"], false, mtx)
+	//https://learnopengl.com/Advanced-OpenGL/Blending
+	/*if (layer > 1) {
+		this.gl.enable(this.gl.BLEND);
+		this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
+		this.gl.blendEquation(this.gl.FUNC_ADD);
+	}*/
+
 	for (let i = 0; i < (this.back.dims[3]); i++) { //output slices
+		//if ((layer > 1) && (((i+layer) % 2) === 0)) continue;
 		var coordZ = 1/this.back.dims[3] * (i + 0.5);
 		this.gl.uniform1f(orientShader.uniforms["coordZ"], coordZ);
 		this.gl.framebufferTextureLayer(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, outTexture, 0, i);
-		this.gl.clear(this.gl.DEPTH_BUFFER_BIT); //only for background and first overlay!
+		if (layer <= 1) //layer 0 (background) and leyer 1 (1st overlay) only!
+			this.gl.clear(this.gl.DEPTH_BUFFER_BIT); //only for background and first overlay!
 		this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 5, 4);
 	}
 	this.gl.deleteTexture(tempTex3D);
@@ -868,7 +881,7 @@ Niivue.prototype.drawText = function(xy, str) { //to right of x, vertically cent
 	if (this.opts.textHeight <= 0) return;
 	this.fontShader.use(this.gl);
 	let scale = (this.opts.textHeight * this.gl.canvas.height);
-  this.gl.enable(this.gl.BLEND)
+	this.gl.enable(this.gl.BLEND)
 	this.gl.uniform2f(this.fontShader.uniforms["canvasWidthHeight"], this.gl.canvas.width, this.gl.canvas.height);
 	this.gl.uniform4fv(this.fontShader.uniforms["fontColor"], this.opts.crosshairColor);
 	let screenPxRange = scale / this.fontMets.size * this.fontMets.distanceRange;
@@ -903,8 +916,6 @@ Niivue.prototype.draw2D = function(leftTopWidthHeight, axCorSag) {
 	let isMirrorLR = ((this.isRadiologicalConvention) && (axCorSag < this.sliceTypeSagittal))
 	this.sliceShader.use(this.gl);
 	this.gl.uniform1f(this.sliceShader.uniforms["opacity"], this.backOpacity);
-  // TODO: set overlay opacity in shader (and blend with brackground so that binary masks don't just show black everywhere when they are the top layer)
-  //this.gl.uniform1f(this.sliceShader.uniforms["overlay_opacity"], this.overlayOpacity);
 	this.gl.uniform1i(this.sliceShader.uniforms["axCorSag"], axCorSag);
 	this.gl.uniform1f(this.sliceShader.uniforms["slice"], crossXYZ[2]);
 	this.gl.uniform2fv(this.sliceShader.uniforms["canvasWidthHeight"], [this.gl.canvas.width, this.gl.canvas.height]);
@@ -980,7 +991,7 @@ Niivue.prototype.draw3D = function() {
 	//gl.enable(gl.CULL_FACE);
 	//gl.cullFace(gl.FRONT);
 	this.gl.uniformMatrix4fv(this.renderShader.uniforms["mvpMtx"], false, m);
-	this.gl.uniform1f(this.renderShader.uniforms["overlays"], this.overlays); // TODO: keep overlays as overlays, but maybe change this.overlays to volumes
+	this.gl.uniform1f(this.renderShader.uniforms["overlays"], this.overlays);
 	this.gl.uniform4fv(this.renderShader.uniforms["clipPlane"], this.scene.clipPlane);
 	this.gl.uniform3fv(this.renderShader.uniforms["rayDir"], rayDir);
 	this.gl.uniform3fv(this.renderShader.uniforms["texVox"], vox);
@@ -1093,13 +1104,4 @@ Niivue.prototype.drawScene = function() {
 	//bus.$emit('crosshair-pos-change', posString);
 	return posString
 } // drawScene()
-
-
-/* TODO: remove bus and handle this as Niivue.prototype method
-bus.$on('colormap-change', function (selectedColorMap) {
-    selectColormap(getGL(), selectedColorMap)
-    drawSlices(getGL(), _overlayItem)
-});
-*/
-
 
