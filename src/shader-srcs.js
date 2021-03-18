@@ -181,6 +181,7 @@ void main() {
 	color = vec4(texture(volume, texPos).rgb, opacity);
 	vec4 ocolor = texture(overlay, texPos);
 	color.rgb = mix(color.rgb, ocolor.rgb, ocolor.a);
+	color.a = color.a + (ocolor.a * (1.0 - color.a)); 
 }`;
 
 export var fragLineShader =
@@ -316,6 +317,7 @@ uniform float scl_inter;
 uniform float cal_max;
 uniform float cal_min;
 uniform highp sampler2D colormap;
+uniform float opacity;
 uniform mat4 mtx;
 void main(void) {
  vec4 vx = vec4(TexCoord.xy, coordZ, 1.0) * mtx;
@@ -324,4 +326,6 @@ void main(void) {
  float mn = min(cal_min, cal_max);
  f = mix(0.0, 1.0, (f - mn) / r);
  FragColor = texture(colormap, vec2(f, 0.5)).rgba;
+ FragColor.a *= opacity;
+ //if (f <= 0.0) FragColor.a = 1.0;
 }`;
