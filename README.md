@@ -27,6 +27,10 @@ The goal is to have a simple viewer component that can be embedded in an existin
 - [Chris Rorden](https://github.com/neurolabusc)
 - [Christopher Drake](https://github.com/cdrake)
 
+## Acknowledgements 
+
+- [shader.js source](https://github.com/Twinklebear/webgl-util)
+
 ## Alternatives
 
 There are several open source JavaScript NIfTI viewers. What makes niivue unique is that it is a self contained Vue.js component. This makes it easy to integrate with Vue web pages. Unlike many alternatives, niivue does not use [three.js](https://threejs.org). This means the WebGL calls are tuned for voxel display, and the screen is only refreshed when needed (preserving battery life and helping your computer do other tasks). On the other hand, niivue does not have access to the three.js user interface widgets, requiring the developer to use vue.js components. Since there are numerous free alternatives, you can choose the optimal tool for your task.
@@ -48,10 +52,8 @@ There are several open source JavaScript NIfTI viewers. What makes niivue unique
 ```
 # You must install nodejs on your system FIRST!
 
-# Use https protocol if needed
-git clone --recurse-submodules git@github.com:hanayik/niivue.git
-
-# webgl-util is a git submodule so the command above clones that too
+# Use https protocol also if you want
+git clone git@github.com:hanayik/niivue.git
 
 cd niivue
 
