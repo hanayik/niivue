@@ -1,5 +1,5 @@
 import * as nii from "nifti-reader-js"
-import { Shader } from "./webgl-util/shader.js";
+import { Shader } from "./shader.js";
 import * as mat from "gl-matrix";
 import { vertSliceShader, fragSliceShader } from "./shader-srcs.js";
 import { vertLineShader, fragLineShader } from "./shader-srcs.js";
