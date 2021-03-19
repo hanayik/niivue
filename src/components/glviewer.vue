@@ -107,6 +107,15 @@ export default {
     viewer.appendChild(glEl)
     const canvas = document.querySelector("#gl");
     const gl = canvas.getContext("webgl2");
+    if (!gl) {
+      if (typeof(WebGL2RenderingContext) !== 'undefined') {
+        alert('your browser appears to support WebGL2 but it might be disabled. Niivue might not work');
+      } else {
+        alert('your browser has no WebGL2 support, Niivue will not work! If you are using safari, you can enable the developer menu and activate the WebGL2 item under experimental features.');
+      }
+    } else {
+      console.log('webgl2 works!');
+    }
 
     var gc = new Hammer(canvas); // gesture controller
     gc.get('press').set({ time: 2000 });

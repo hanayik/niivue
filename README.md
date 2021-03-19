@@ -23,8 +23,13 @@ The goal is to have a simple viewer component that can be embedded in an existin
  
 ## Contributors
 
-- Taylor Hanayik
-- Chris Rorden
+- [Taylor Hanayik](https://github.com/hanayik)
+- [Chris Rorden](https://github.com/neurolabusc)
+- [Christopher Drake](https://github.com/cdrake)
+
+## Acknowledgements 
+
+- [shader.js source](https://github.com/Twinklebear/webgl-util)
 
 ## Alternatives
 
@@ -47,10 +52,8 @@ There are several open source JavaScript NIfTI viewers. What makes niivue unique
 ```
 # You must install nodejs on your system FIRST!
 
-# Use https protocol if needed
-git clone --recurse-submodules git@github.com:hanayik/niivue.git
-
-# webgl-util is a git submodule so the command above clones that too
+# Use https protocol also if you want
+git clone git@github.com:hanayik/niivue.git
 
 cd niivue
 
