@@ -166,7 +166,6 @@ export default {
           colorMap: "Winter",
           opacity: 100,
           visible: true,
-          texture: null,
         },
       ]
     }

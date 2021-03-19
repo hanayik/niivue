@@ -534,7 +534,6 @@ Niivue.prototype.updateGLVolume = function() { //load volume or change contrast
 			visibleLayers++;
 		}
 		else {
-			this.gl.deleteTexture(this.volumes[i].texture);
 			if(visibleLayers) {
 				this.rgbaTex(this.overlayTexture, this.gl.TEXTURE2, [2,2,2,2], true);
 			}
