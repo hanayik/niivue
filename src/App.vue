@@ -153,6 +153,7 @@ export default {
           intensityRange:[0, 100], // not used yet
           colorMap: "gray",
           opacity: 100,
+          visible: true,
         },
         {
           url: "./hippo.nii.gz",
@@ -163,6 +164,7 @@ export default {
           intensityRange:[0, 100], // not used yet
           colorMap: "Winter",
           opacity: 100,
+          visible: true,
         },
       ]
     }
@@ -184,7 +186,8 @@ export default {
             intensityMax:100,
             intensityRange: [0,100],
             colorMap: "gray",
-            opacity: 100
+            opacity: 100,
+            visible: true,
           }
         )
       }
