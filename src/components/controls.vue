@@ -124,9 +124,22 @@ export default {
     toggleVisibility: function(index) {
       // to trigger change detection: https://vuejs.org/v2/guide/reactivity.html#Change-Detection-Caveats
       // https://stackoverflow.com/questions/53557086/vue-how-to-perform-reactive-object-change-detection-in-v-for
+      if (this.overlays_.length === 1) {
+        // disable eye toggle if only one overlay. Why remove the only visiable thing?
+        return
+      }
       this.$set(this.overlays_[index], 'visible', !this.overlays_[index].visible);
-      
-      bus.$emit('refresh');
+
+      let vis = this.overlays_[index].visible
+      if (vis){
+        bus.$emit('opacity-change', {volIdx:index, newOpacity:1});
+      } else {
+        bus.$emit('opacity-change', {volIdx:index, newOpacity:0});
+      }
+    },
+
+    visibilityIcon: function(val) {
+      return val ? 'mdi-eye' : 'mdi-eye-off';
     },
 
     onColorChange: function(i) {
@@ -144,9 +157,6 @@ export default {
       alert('adding overlays in this demo is not implemented yet! :)')
     },
 
-    visibilityIcon: function(val) {
-      return val ? 'mdi-eye' : 'mdi-eye-off';
-    },
   }
 
 };
