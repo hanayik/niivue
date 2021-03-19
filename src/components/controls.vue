@@ -131,7 +131,7 @@ export default {
       // https://stackoverflow.com/questions/53557086/vue-how-to-perform-reactive-object-change-detection-in-v-for
       this.$set(this.overlays_[index], 'visible', !this.overlays_[index].visible);
       
-      bus.$emit('visibility-change');
+      bus.$emit('refresh');
     },
 
     onColorChange: function(i) {

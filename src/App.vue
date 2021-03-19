@@ -154,6 +154,7 @@ export default {
           colorMap: "gray",
           opacity: 100,
           visible: true,
+          texture: null,
         },
         {
           url: "./IPL.nii.gz", //"./hippo.nii.gz",
@@ -165,6 +166,7 @@ export default {
           colorMap: "Winter",
           opacity: 100,
           visible: true,
+          texture: null,
         },
       ]
     }
@@ -189,6 +191,7 @@ export default {
             colorMap: "gray",
             opacity: 100,
             visible: true,
+            texture: null,
           }
         )
       }
