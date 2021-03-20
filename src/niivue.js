@@ -571,25 +571,123 @@ Niivue.prototype.updateGLVolume = function() { //load volume or change contrast
 	this.drawScene();
 } // updateVolume()
 
+function intensityRaw2Scaled(hdr, raw) {
+  if (hdr.scl_slope === 0) hdr.scl_slope = 1.0;
+  return (raw * hdr.scl_slope) + hdr.scl_inter
+}
+
+function setMinMax(hdr, mn, mx) {
+  hdr.cal_min = mn;
+  hdr.cal_max = mx;
+}
+
 // given an overlayItem and its img TypedArray, calculate 2% and 98% display range if needed
-Niivue.prototype.calMinMax = function(overlayItem, img, lop=0.02, hip=0.98){
+//clone FSL robust_range estimates https://github.com/rordenlab/niimath/blob/331758459140db59290a794350d0ff3ad4c37b67/src/core32.c#L1215
+Niivue.prototype.calMinMax = function(overlayItem, img, percentileFrac=0.02, ignoreZeroVoxels = false){
+  /*
   if (overlayItem.volume.hdr.cal_min !== 0 && overlayItem.volume.hdr.cal_max !== 0){
     console.log("not setting the calmin and max")
     return
+  }*/
+  let imgRaw
+  let hdr = overlayItem.volume.hdr
+  if (hdr.datatypeCode === 2)
+    imgRaw = new Uint8Array(img)
+  else if (hdr.datatypeCode === 4)
+    imgRaw = new Int16Array(img)
+  else if (hdr.datatypeCode === 16)
+    imgRaw = new Float32Array(img)
+  else if (hdr.datatypeCode === 64)
+    imgRaw = new Float64Array(img)
+  else if (hdr.datatypeCode === 512)
+    imgRaw = new Uint16Array(img)
+  //determin full range: min..max
+  let mn=img[0]
+  let mx=img[0]
+  let nZero = 0
+  let nNan = 0
+  let nVox = imgRaw.length
+  for (let i=0; i < nVox; i++){
+    if (isNaN(imgRaw[i])) {
+      nNan++
+      continue
+    }
+    if (imgRaw[i] === 0) {
+      nZero++
+      continue
+    }
+    mn = Math.min(imgRaw[i],mn)
+    mx = Math.max(imgRaw[i],mx)
   }
-  let mn=0
-  let mx=0
-  for (let i=0; i<img.length; i++){
-    mn = Math.min(img[i],mn)
-    mx = Math.max(img[i],mx)
+  let mnScale = intensityRaw2Scaled(hdr, mn);
+  let mxScale = intensityRaw2Scaled(hdr, mx);
+  if (!ignoreZeroVoxels)
+    nZero = 0;
+  nZero += nNan;
+  let n2pct = Math.round((nVox - nZero) * percentileFrac)
+  if ((n2pct < 1) || (mn === mx)) {
+    //overlayItem.volume.hdr.cal_min = mn;
+    //overlayItem.volume.hdr.cal_max = mx;
+    console.log("no variability in image intensity?")
+    setMinMax(hdr, mnScale, mxScale)
+    return;
   }
-  let p1 = mx*lop
-  let p2 = mx*hip
-  overlayItem.volume.hdr.cal_min = p1
-  overlayItem.volume.hdr.cal_max = p2
+  //let nBins = 1001
+  let nBins = 101
+  let scl = (nBins-1)/(mx-mn)
+  let hist = new Array(nBins);
+  for (let i = 0; i < nBins; i++)
+    hist[i] = 0
+  if (ignoreZeroVoxels) {
+    for (let i = 0; i <= nVox; i++) {
+      if (imgRaw[i] === 0)
+        continue;
+      if (isNaN(imgRaw[i]))
+        continue;
+      hist[ (imgRaw[i]-mn) * scl] ++
+    }  
+  } else {
+    for (let i = 0; i <= nVox; i++) {
+      if (isNaN(imgRaw[i]))
+        continue;
+      hist[ (imgRaw[i]-mn) * scl] ++
+    }
+  }
+  let n = 0
+  let lo = 0
+  while (n < n2pct) {
+    n += hist[lo];
+    lo++;
+  }
+  lo --; //remove final increment  
+  n = 0
+  let hi = nBins
+  while (n < n2pct) {
+    hi--
+    n += hist[hi]
+  }
+  if (lo == hi) { //MAJORITY are not black or white
+    let ok = -1;
+    while (ok !== 0) {
+      if (lo > 0) {
+        lo--;
+        if (hist[lo] > 0) ok = 0;	
+      }
+      if ((ok != 0) && (hi < (nBins-1))) {
+        hi++;
+        if (hist[hi] > 0) ok = 0;	
+      }
+      if ((lo == 0) && (hi == (nBins-1))) ok = 0;
+    } //while not ok
+  } //if lo == hi
+  let pct2 = intensityRaw2Scaled(hdr, (lo)/scl + mn);
+  let pct98 = intensityRaw2Scaled(hdr, (hi)/scl + mn);
+  //overlayItem.volume.hdr.cal_min = pct2
+  //overlayItem.volume.hdr.cal_max = pct98
+  setMinMax(hdr, pct2, pct98)
+  console.log("full range %f..%f  (voxels 0 or NaN = %i) robust range %f..%f", mnScale, mxScale, nZero, pct2, pct98)
   // returns nothing, modifies overlayItem in place
 }
-
 Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	let hdr = overlayItem.volume.hdr
 	let img = overlayItem.volume.img
