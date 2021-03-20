@@ -632,8 +632,7 @@ Niivue.prototype.calMinMax = function(overlayItem, img, percentileFrac=0.02, ign
     setMinMax(hdr, mnScale, mxScale)
     return;
   }
-  //let nBins = 1001
-  let nBins = 101
+  let nBins = 1001
   let scl = (nBins-1)/(mx-mn)
   let hist = new Array(nBins);
   for (let i = 0; i < nBins; i++)
