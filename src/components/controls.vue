@@ -15,7 +15,7 @@
           <v-expansion-panel-header>
             <v-row no-gutters class="align-center">
               <v-icon class="mx-2 drag-handle"> mdi-drag-horizontal-variant </v-icon>
-              <v-icon class="mx-2" :ref="overlay.name + i" @click.stop="toggleEye(overlay.name, i)">mdi-eye</v-icon>{{ overlay.name }}
+              <v-icon class="mx-2" @click.stop="toggleVisibility(i)">{{ visibilityIcon(overlays_[i].visible) }}</v-icon>{{ overlay.name }}
             </v-row>
             
           </v-expansion-panel-header>
@@ -121,16 +121,25 @@ export default {
   },
 
   methods: {
-    toggleEye: function(overlayname, index) {
-      if(!(overlayname + index in this.overlayVisibilityState)) {
-        this.overlayVisibilityState[overlayname + index] = "mdi-eye";
+    toggleVisibility: function(index) {
+      // to trigger change detection: https://vuejs.org/v2/guide/reactivity.html#Change-Detection-Caveats
+      // https://stackoverflow.com/questions/53557086/vue-how-to-perform-reactive-object-change-detection-in-v-for
+      if (this.overlays_.length === 1) {
+        // disable eye toggle if only one overlay. Why remove the only visiable thing?
+        return
       }
-      
-      const newVisibility = this.overlayVisibilityState[overlayname + index] == "mdi-eye" ? "mdi-eye-off" : "mdi-eye";
-      let className = this.$refs[overlayname + index][0].$el.className;
-      className = className.replace(` ${this.overlayVisibilityState[overlayname + index]}`, ` ${newVisibility} `);
-      this.$refs[overlayname + index][0].$el.className = className;
-      this.overlayVisibilityState[overlayname + index] = newVisibility;
+      this.$set(this.overlays_[index], 'visible', !this.overlays_[index].visible);
+
+      let vis = this.overlays_[index].visible
+      if (vis){
+        bus.$emit('opacity-change', {volIdx:index, newOpacity:1});
+      } else {
+        bus.$emit('opacity-change', {volIdx:index, newOpacity:0});
+      }
+    },
+
+    visibilityIcon: function(val) {
+      return val ? 'mdi-eye' : 'mdi-eye-off';
     },
 
     onColorChange: function(i) {
@@ -146,7 +155,8 @@ export default {
 
     onAddOverlay: function () {
       alert('adding overlays in this demo is not implemented yet! :)')
-    }
+    },
+
   }
 
 };

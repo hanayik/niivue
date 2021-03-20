@@ -266,7 +266,7 @@ export default {
     }.bind(this));
 
     bus.$on('refresh', function () {
-      this.niivue.loadVolumes(this.overlays); 
+      this.niivue.updateGLVolume(this.overlays); 
     }.bind(this));
   },
 };
