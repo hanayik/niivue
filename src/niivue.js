@@ -630,7 +630,6 @@ Niivue.prototype.calMinMaxCore = function(overlayItem, img, percentileFrac=0.02,
 } //sliceScale
 
 Niivue.prototype.calMinMax = function(overlayItem, img, percentileFrac=0.02, ignoreZeroVoxels = false){
-	//let {cal_min, cal_max, global_min, global_max} = this.calMinMaxCore(overlayItem, img, percentileFrac, ignoreZeroVoxels)
 	let minMax = this.calMinMaxCore(overlayItem, img, percentileFrac, ignoreZeroVoxels)
 	console.log("cal_min, cal_max, global_min, global_max", minMax[0], minMax[1], minMax[2], minMax[3])
 	overlayItem.cal_min = minMax[0]
@@ -721,9 +720,8 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 		this.gl.texStorage3D(this.gl.TEXTURE_3D, 6, this.gl.R16UI, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
 		this.gl.texSubImage3D(this.gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], this.gl.RED_INTEGER, this.gl.UNSIGNED_SHORT, imgRaw);
 	}
-
-  // set display cal_min, cal_max display range if required
-  this.calMinMax(overlayItem, imgRaw)
+	if (overlayItem.global_min === undefined) //only once, first time volume is loaded
+		this.calMinMax(overlayItem, imgRaw)
 	orientShader.use(this.gl);
 	this.selectColormap(overlayItem.colorMap)
 	this.gl.uniform1f(orientShader.uniforms["cal_min"], overlayItem.cal_min);
@@ -735,13 +733,6 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	this.gl.uniform1f(orientShader.uniforms["scl_slope"],hdr.scl_slope);
 	this.gl.uniform1f(orientShader.uniforms["opacity"], opacity);
 	this.gl.uniformMatrix4fv(orientShader.uniforms["mtx"], false, mtx)
-	//https://learnopengl.com/Advanced-OpenGL/Blending
-	/*if (layer > 1) {
-		this.gl.enable(this.gl.BLEND);
-		this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
-		this.gl.blendEquation(this.gl.FUNC_ADD);
-	}*/
-
 	for (let i = 0; i < (this.back.dims[3]); i++) { //output slices
 		//if ((layer > 1) && (((i+layer) % 2) === 0)) continue;
 		var coordZ = 1/this.back.dims[3] * (i + 0.5);
@@ -815,10 +806,13 @@ Niivue.prototype.sliceScale = function() {
 Niivue.prototype.mouseClick = function(x, y, posChange=0, isDelta=true) {
   var posNow
 	var posFuture
-
-  if (this.sliceType === this.sliceTypeRender)
-		return
-	//console.log("Click pixels (x,y):", x, y);
+  if (this.sliceType === this.sliceTypeRender) {
+    if (posChange === 0) return;
+    if (posChange > 0) this.volScaleMultiplier = Math.min(2.0, this.volScaleMultiplier *  1.1)
+    if (posChange < 0) this.volScaleMultiplier = Math.max(0.5, this.volScaleMultiplier *  0.9)
+    this.drawScene()
+    return
+  }
 	if ((this.numScreenSlices < 1) || (this.gl.canvas.height < 1) || (this.gl.canvas.width < 1))
 		return;
 	//mouse click X,Y in screen coordinates, origin at top left
@@ -1002,13 +996,27 @@ Niivue.prototype.draw2D = function(leftTopWidthHeight, axCorSag) {
 Niivue.prototype.draw3D = function() {
 	let {volScale, vox} = this.sliceScale(); // slice scale determined by this.back --> the base image layer
 	this.renderShader.use(this.gl);
+	let mn = Math.min(this.gl.canvas.width, this.gl.canvas.height)
+	if (mn <= 0) return;
+	mn *= this.volScaleMultiplier
+	let xCenter = this.gl.canvas.width / 2;
+	let yCenter = this.gl.canvas.height / 2;
+	let xPix = mn
+	let yPix = mn
+	this.gl.viewport(xCenter-(xPix * 0.5), yCenter - (yPix * 0.5) , xPix, yPix);
+	//console.log(mn, this.gl.canvas.width, this.gl.canvas.height)
+	/*
 	if (this.gl.canvas.width < this.gl.canvas.height) // screen aspect ratio
 		this.gl.viewport(0, (this.gl.canvas.height - this.gl.canvas.width)* 0.5, this.gl.canvas.width, this.gl.canvas.width);
 	else
-		this.gl.viewport((this.gl.canvas.width - this.gl.canvas.height)* 0.5, 0, this.gl.canvas.height, this.gl.canvas.height);
+		this.gl.viewport((this.gl.canvas.width - this.gl.canvas.height)* 0.5, 0, this.gl.canvas.height, this.gl.canvas.height);*/
 	this.gl.clearColor(0.2, 0, 0, 1);
 	var m = mat.mat4.create();
-	var fDistance = -0.54;
+	var fDistance = -0.54 * this.volScaleMultiplier;
+	//https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/depthRange
+	// default is 0..1
+	// unit cube with corner aligned 
+	//this.gl.depthRange(0.1, -fDistance * 3.0); //xerxes
 	//modelMatrix *= TMat4.Translate(0, 0, -fDistance);
 	mat.mat4.translate(m,m, [0, 0, fDistance]);
 	// https://glmatrix.net/docs/module-mat4.html  https://glmatrix.net/docs/mat4.js.html
@@ -1017,6 +1025,7 @@ Niivue.prototype.draw3D = function() {
 	rad = (this.scene.renderAzimuth) * Math.PI / 180;
 	mat.mat4.rotate(m,m, rad, [0, 0, 1]);
 	mat.mat4.scale(m, m, volScale); // volume aspect ratio
+	
 	//compute ray direction
 	var inv = mat.mat4.create();
 	mat.mat4.invert(inv, m);
@@ -1030,7 +1039,7 @@ Niivue.prototype.draw3D = function() {
 	if (Math.abs(rayDir[1]) < tiny) rayDir[1] = tiny;
 	if (Math.abs(rayDir[2]) < tiny) rayDir[2] = tiny;
 	//console.log( ">>", renderAzimuth, " : ", renderElevation, ">>>> ", rayDir);
-	//gl.disable(gl.DEPTH_TEST);
+	//this.gl.disable(this.gl.DEPTH_TEST);
 	//gl.enable(gl.CULL_FACE);
 	//gl.cullFace(gl.FRONT);
 	this.gl.uniformMatrix4fv(this.renderShader.uniforms["mvpMtx"], false, m);
