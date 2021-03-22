@@ -202,24 +202,6 @@ Niivue.prototype.attachTo = function (id) {
   return this
 } // attachTo
 
-
-// TODO: remove this method (no used)
-Niivue.prototype.scaleTo8Bit = function (A, volume) {
-	var mn = volume.hdr.cal_min;
-	var mx = volume.hdr.cal_max;
-	var vox = A.length
-	var img8 = new Uint8ClampedArray(vox);
-	var scale = 1;
-	var i
-	if (mx > mn) scale = 255 / (mx - mn);
-	for (i = 0; i < (vox - 1); i++) {
-		var v = A[i];
-		v = (v * volume.hdr.scl_slope) + volume.hdr.scl_inter;
-		img8[i] = (v - mn) * scale;
-	}
-	return img8 // return scaled
-} // scaleTo8Bit()
-
 Niivue.prototype.overlayRGBA = function (volume) {
 	let hdr = volume.hdr;
 	let vox = hdr.dims[1] * hdr.dims[2] * hdr.dims[3];
@@ -247,37 +229,6 @@ Niivue.prototype.overlayRGBA = function (volume) {
 	}
 	return imgRGBA;
 } // overlayRGBA()
-
-
-// TODO: remove this method (not used)
-Niivue.prototype.calibrateIntensity = function(A, volume) {
-  var vox = A.length;
-	var mn = Infinity;
-	var mx = -Infinity;
-	var i
-	for (i = 0; i < (vox - 1); i++) {
-		if (!isFinite(A[i])) continue;
-		if (A[i] < mn) mn = A[i];
-		if (A[i] > mx) mx = A[i];
-	}
-	//calibrate intensity
-	if ((isFinite(volume.hdr.scl_slope)) && (isFinite(volume.hdr.scl_inter)) && (volume.hdr.scl_slope !== 0.0)) {
-		//console.log(">> mn %f mx %f %f %f", mn, mx, hdr.scl_slope, hdr.scl_inter);
-		mn = (mn * volume.hdr.scl_slope) + volume.hdr.scl_inter;
-		mx = (mx * volume.hdr.scl_slope) + volume.hdr.scl_inter;
-	} else {
-		volume.hdr.scl_slope = 1.0;
-		volume.hdr.scl_inter = 0.0;
-	}
-	//console.log("vx %d type %d mn %f mx %f", vox, hdr.datatypeCode, mn, mx);
-	//console.log("cal mn..mx %f..%f", hdr.cal_min, hdr.cal_max);
-	volume.hdr.global_min = mn;
-	volume.hdr.global_max = mx;
-	if ((!isFinite(volume.hdr.cal_min)) || (!isFinite(volume.hdr.cal_max)) || (volume.hdr.cal_min >= volume.hdr.cal_max)) {
-		volume.hdr.cal_min = mn;
-		volume.hdr.cal_max = mx;
-	}
-} // calibrateIntensity()
 
 Niivue.prototype.vox2mm = function (XYZ, mtx ) {
 	let sform = mat.mat4.clone(mtx);
@@ -571,24 +522,121 @@ Niivue.prototype.updateGLVolume = function() { //load volume or change contrast
 	this.drawScene();
 } // updateVolume()
 
-// given an overlayItem and its img TypedArray, calculate 2% and 98% display range if needed
-Niivue.prototype.calMinMax = function(overlayItem, img, lop=0.02, hip=0.98){
-  if (overlayItem.volume.hdr.cal_min !== 0 && overlayItem.volume.hdr.cal_max !== 0){
-    console.log("not setting the calmin and max")
-    return
-  }
-  let mn=0
-  let mx=0
-  for (let i=0; i<img.length; i++){
-    mn = Math.min(img[i],mn)
-    mx = Math.max(img[i],mx)
-  }
-  let p1 = mx*lop
-  let p2 = mx*hip
-  overlayItem.volume.hdr.cal_min = p1
-  overlayItem.volume.hdr.cal_max = p2
-  // returns nothing, modifies overlayItem in place
+function intensityRaw2Scaled(hdr, raw) {
+  if (hdr.scl_slope === 0) hdr.scl_slope = 1.0;
+  return (raw * hdr.scl_slope) + hdr.scl_inter
 }
+
+// given an overlayItem and its img TypedArray, calculate 2% and 98% display range if needed
+//clone FSL robust_range estimates https://github.com/rordenlab/niimath/blob/331758459140db59290a794350d0ff3ad4c37b67/src/core32.c#L1215
+//ToDo: convert to web assembly, this is slow in JavaScript
+Niivue.prototype.calMinMaxCore = function(overlayItem, img, percentileFrac=0.02, ignoreZeroVoxels = false){
+  let imgRaw
+  let hdr = overlayItem.volume.hdr
+  if (hdr.datatypeCode === 2)
+    imgRaw = new Uint8Array(img)
+  else if (hdr.datatypeCode === 4)
+    imgRaw = new Int16Array(img)
+  else if (hdr.datatypeCode === 16)
+    imgRaw = new Float32Array(img)
+  else if (hdr.datatypeCode === 64)
+    imgRaw = new Float64Array(img)
+  else if (hdr.datatypeCode === 512)
+    imgRaw = new Uint16Array(img)
+  //determine full range: min..max
+  let mn=img[0]
+  let mx=img[0]
+  let nZero = 0
+  let nNan = 0
+  let nVox = imgRaw.length
+  for (let i=0; i < nVox; i++){
+    if (isNaN(imgRaw[i])) {
+      nNan++
+      continue
+    }
+    if (imgRaw[i] === 0) {
+      nZero++
+      continue
+    }
+    mn = Math.min(imgRaw[i],mn)
+    mx = Math.max(imgRaw[i],mx)
+  }
+  var mnScale = intensityRaw2Scaled(hdr, mn)
+  var mxScale = intensityRaw2Scaled(hdr, mx)
+  if (!ignoreZeroVoxels)
+    nZero = 0
+  nZero += nNan
+  let n2pct = Math.round((nVox - nZero) * percentileFrac)
+  if ((n2pct < 1) || (mn === mx)) {
+    console.log("no variability in image intensity?")
+	return [ mnScale, mxScale, mnScale, mxScale ]
+  }
+  let nBins = 1001
+  let scl = (nBins-1)/(mx-mn)
+  let hist = new Array(nBins)
+  for (let i = 0; i < nBins; i++)
+    hist[i] = 0
+  if (ignoreZeroVoxels) {
+    for (let i = 0; i <= nVox; i++) {
+      if (imgRaw[i] === 0)
+        continue
+      if (isNaN(imgRaw[i]))
+        continue
+      hist[ (imgRaw[i]-mn) * scl] ++
+    }  
+  } else {
+    for (let i = 0; i <= nVox; i++) {
+      if (isNaN(imgRaw[i]))
+        continue
+      hist[ (imgRaw[i]-mn) * scl] ++
+    }
+  }
+  let n = 0
+  let lo = 0
+  while (n < n2pct) {
+    n += hist[lo]
+    lo++
+  }
+  lo -- //remove final increment  
+  n = 0
+  let hi = nBins
+  while (n < n2pct) {
+    hi--
+    n += hist[hi]
+  }
+  if (lo == hi) { //MAJORITY are not black or white
+    let ok = -1
+    while (ok !== 0) {
+      if (lo > 0) {
+        lo--
+        if (hist[lo] > 0) ok = 0
+      }
+      if ((ok != 0) && (hi < (nBins-1))) {
+        hi++
+        if (hist[hi] > 0) ok = 0
+      }
+      if ((lo == 0) && (hi == (nBins-1))) ok = 0
+    } //while not ok
+  } //if lo == hi
+  var pct2 = intensityRaw2Scaled(hdr, (lo)/scl + mn)
+  var pct98 = intensityRaw2Scaled(hdr, (hi)/scl + mn)	
+  console.log("full range %f..%f  (voxels 0 or NaN = %i) robust range %f..%f", mnScale, mxScale, nZero, pct2, pct98)
+  if ((overlayItem.volume.hdr.cal_min < overlayItem.volume.hdr.cal_max) && (overlayItem.volume.hdr.cal_min >= mnScale) && (overlayItem.volume.hdr.cal_max <= mxScale)){
+    console.log("ignoring robust range: using header cal_min and cal_max")
+    pct2 = overlayItem.volume.hdr.cal_min;
+    pct98 = overlayItem.volume.hdr.cal_max;
+  }
+  return [ pct2, pct98, mnScale, mxScale ]
+} //sliceScale
+
+Niivue.prototype.calMinMax = function(overlayItem, img, percentileFrac=0.02, ignoreZeroVoxels = false){
+	let minMax = this.calMinMaxCore(overlayItem, img, percentileFrac, ignoreZeroVoxels)
+	console.log("cal_min, cal_max, global_min, global_max", minMax[0], minMax[1], minMax[2], minMax[3])
+	overlayItem.cal_min = minMax[0]
+	overlayItem.cal_max = minMax[1]
+	overlayItem.global_min = minMax[2]	
+	overlayItem.global_max = minMax[3]
+} // calMinMax()
 
 Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	let hdr = overlayItem.volume.hdr
@@ -672,13 +720,12 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 		this.gl.texStorage3D(this.gl.TEXTURE_3D, 6, this.gl.R16UI, hdr.dims[1], hdr.dims[2], hdr.dims[3]);
 		this.gl.texSubImage3D(this.gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], this.gl.RED_INTEGER, this.gl.UNSIGNED_SHORT, imgRaw);
 	}
-
-  // set display cal_min, cal_max display range if required
-  this.calMinMax(overlayItem, imgRaw)
+	if (overlayItem.global_min === undefined) //only once, first time volume is loaded
+		this.calMinMax(overlayItem, imgRaw)
 	orientShader.use(this.gl);
 	this.selectColormap(overlayItem.colorMap)
-	this.gl.uniform1f(orientShader.uniforms["cal_min"], hdr.cal_min);
-	this.gl.uniform1f(orientShader.uniforms["cal_max"], hdr.cal_max);
+	this.gl.uniform1f(orientShader.uniforms["cal_min"], overlayItem.cal_min);
+	this.gl.uniform1f(orientShader.uniforms["cal_max"], overlayItem.cal_max);
 	this.gl.bindTexture(this.gl.TEXTURE_3D, tempTex3D);
 	this.gl.uniform1i(orientShader.uniforms["intensityVol"], 6);
 	this.gl.uniform1i(orientShader.uniforms["colormap"], 1);
@@ -686,13 +733,6 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	this.gl.uniform1f(orientShader.uniforms["scl_slope"],hdr.scl_slope);
 	this.gl.uniform1f(orientShader.uniforms["opacity"], opacity);
 	this.gl.uniformMatrix4fv(orientShader.uniforms["mtx"], false, mtx)
-	//https://learnopengl.com/Advanced-OpenGL/Blending
-	/*if (layer > 1) {
-		this.gl.enable(this.gl.BLEND);
-		this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
-		this.gl.blendEquation(this.gl.FUNC_ADD);
-	}*/
-
 	for (let i = 0; i < (this.back.dims[3]); i++) { //output slices
 		//if ((layer > 1) && (((i+layer) % 2) === 0)) continue;
 		var coordZ = 1/this.back.dims[3] * (i + 0.5);
@@ -766,10 +806,13 @@ Niivue.prototype.sliceScale = function() {
 Niivue.prototype.mouseClick = function(x, y, posChange=0, isDelta=true) {
   var posNow
 	var posFuture
-
-  if (this.sliceType === this.sliceTypeRender)
-		return
-	//console.log("Click pixels (x,y):", x, y);
+  if (this.sliceType === this.sliceTypeRender) {
+    if (posChange === 0) return;
+    if (posChange > 0) this.volScaleMultiplier = Math.min(2.0, this.volScaleMultiplier *  1.1)
+    if (posChange < 0) this.volScaleMultiplier = Math.max(0.5, this.volScaleMultiplier *  0.9)
+    this.drawScene()
+    return
+  }
 	if ((this.numScreenSlices < 1) || (this.gl.canvas.height < 1) || (this.gl.canvas.width < 1))
 		return;
 	//mouse click X,Y in screen coordinates, origin at top left
@@ -953,13 +996,27 @@ Niivue.prototype.draw2D = function(leftTopWidthHeight, axCorSag) {
 Niivue.prototype.draw3D = function() {
 	let {volScale, vox} = this.sliceScale(); // slice scale determined by this.back --> the base image layer
 	this.renderShader.use(this.gl);
+	let mn = Math.min(this.gl.canvas.width, this.gl.canvas.height)
+	if (mn <= 0) return;
+	mn *= this.volScaleMultiplier
+	let xCenter = this.gl.canvas.width / 2;
+	let yCenter = this.gl.canvas.height / 2;
+	let xPix = mn
+	let yPix = mn
+	this.gl.viewport(xCenter-(xPix * 0.5), yCenter - (yPix * 0.5) , xPix, yPix);
+	//console.log(mn, this.gl.canvas.width, this.gl.canvas.height)
+	/*
 	if (this.gl.canvas.width < this.gl.canvas.height) // screen aspect ratio
 		this.gl.viewport(0, (this.gl.canvas.height - this.gl.canvas.width)* 0.5, this.gl.canvas.width, this.gl.canvas.width);
 	else
-		this.gl.viewport((this.gl.canvas.width - this.gl.canvas.height)* 0.5, 0, this.gl.canvas.height, this.gl.canvas.height);
+		this.gl.viewport((this.gl.canvas.width - this.gl.canvas.height)* 0.5, 0, this.gl.canvas.height, this.gl.canvas.height);*/
 	this.gl.clearColor(0.2, 0, 0, 1);
 	var m = mat.mat4.create();
-	var fDistance = -0.54;
+	var fDistance = -0.54 * this.volScaleMultiplier;
+	//https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/depthRange
+	// default is 0..1
+	// unit cube with corner aligned 
+	//this.gl.depthRange(0.1, -fDistance * 3.0); //xerxes
 	//modelMatrix *= TMat4.Translate(0, 0, -fDistance);
 	mat.mat4.translate(m,m, [0, 0, fDistance]);
 	// https://glmatrix.net/docs/module-mat4.html  https://glmatrix.net/docs/mat4.js.html
@@ -968,6 +1025,7 @@ Niivue.prototype.draw3D = function() {
 	rad = (this.scene.renderAzimuth) * Math.PI / 180;
 	mat.mat4.rotate(m,m, rad, [0, 0, 1]);
 	mat.mat4.scale(m, m, volScale); // volume aspect ratio
+	
 	//compute ray direction
 	var inv = mat.mat4.create();
 	mat.mat4.invert(inv, m);
@@ -981,7 +1039,7 @@ Niivue.prototype.draw3D = function() {
 	if (Math.abs(rayDir[1]) < tiny) rayDir[1] = tiny;
 	if (Math.abs(rayDir[2]) < tiny) rayDir[2] = tiny;
 	//console.log( ">>", renderAzimuth, " : ", renderElevation, ">>>> ", rayDir);
-	//gl.disable(gl.DEPTH_TEST);
+	//this.gl.disable(this.gl.DEPTH_TEST);
 	//gl.enable(gl.CULL_FACE);
 	//gl.cullFace(gl.FRONT);
 	this.gl.uniformMatrix4fv(this.renderShader.uniforms["mvpMtx"], false, m);
@@ -1015,6 +1073,20 @@ Niivue.prototype.mm2frac = function(mm ) {
 	return frac;
 } // mm2frac()
 
+Niivue.prototype.vox2frac = function(vox) {
+	//convert from  0-index voxel space [0..dim[1]-1, 0..dim[2]-1, 0..dim[3]-1] to normalized texture space XYZ= [0..1, 0..1 ,0..1] 
+	//consider dimension with 3 voxels, the voxel centers are at 0.25, 0.5, 0.75 corresponding to 0,1,2
+	let frac = [ (vox[0]+0.5)/this.back.dims[1], (vox[1]+0.5)/this.back.dims[2], (vox[2]+0.5)/this.back.dims[3] ]
+	return frac
+} // vox2frac()
+
+Niivue.prototype.frac2vox = function(frac) {
+	//convert from normalized texture space XYZ= [0..1, 0..1 ,0..1] to 0-index voxel space [0..dim[1]-1, 0..dim[2]-1, 0..dim[3]-1] 
+	//consider dimension with 3 voxels, the voxel centers are at 0.25, 0.5, 0.75 corresponding to 0,1,2
+	let vox = [ (frac[0]*this.back.dims[1])-0.5, (frac[1]*this.back.dims[2])-0.5, (frac[2]*this.back.dims[3])-0.5 ]
+	return vox
+} // frac2vox()
+
 Niivue.prototype.frac2mm = function(frac) {
   //convert from normalized texture space XYZ= [0..1, 0..1 ,0..1] to object space in millimeters
 	let pos = mat.vec4.fromValues(frac[0], frac[1], frac[2], 1);
@@ -1047,59 +1119,62 @@ Niivue.prototype.drawScene = function() {
 	this.gl.clearColor(this.opts.backColor[0], this.opts.backColor[1], this.opts.backColor[2], this.opts.backColor[3]);
 	this.gl.clear(this.gl.COLOR_BUFFER_BIT);
 	let posString = '';
+	if(!this.back.dims) // exit if we have nothing to draw
+		return
+	if (this.sliceType === this.sliceTypeRender) //draw rendering
+		return this.draw3D();
+	let {volScale} = this.sliceScale();
+	this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
+	this.numScreenSlices = 0;
+	if (this.sliceType === this.sliceTypeAxial) { //draw axial
+		let leftTopWidthHeight = this.scaleSlice(volScale[0], volScale[1]);
+		this.draw2D(leftTopWidthHeight, 0);
+	} else if (this.sliceType === this.sliceTypeCoronal) { //draw coronal
+		let leftTopWidthHeight = this.scaleSlice(volScale[0], volScale[2]);
+		this.draw2D(leftTopWidthHeight, 1);
+	} else if (this.sliceType === this.sliceTypeSagittal) { //draw sagittal
+		let leftTopWidthHeight = this.scaleSlice(volScale[1], volScale[2]);
+		this.draw2D(leftTopWidthHeight, 2);
+	} else { //sliceTypeMultiplanar
+		let ltwh = this.scaleSlice(volScale[0]+volScale[1], volScale[1]+volScale[2]);
+		let wX = ltwh[2] * volScale[0]/(volScale[0]+volScale[1]);
+		let ltwh3x1 = this.scaleSlice(volScale[0]+volScale[0]+volScale[1], Math.max(volScale[1],volScale[2]));
+		let wX1 = ltwh3x1[2] * volScale[0]/(volScale[0]+volScale[0]+volScale[1]);
+		if (wX1 > wX) {
+			let pixScale = (wX1 / volScale[0]);
+			let hY1 = volScale[1] * pixScale;
+			let hZ1 = volScale[2] * pixScale;
+			//draw axial
+			this.draw2D([ltwh3x1[0],ltwh3x1[1], wX1, hY1], 0);
+			//draw coronal
+			this.draw2D([ltwh3x1[0] + wX1,ltwh3x1[1], wX1, hZ1], 1);
+			//draw sagittal
+			this.draw2D([ltwh3x1[0] + wX1 + wX1,ltwh3x1[1], hY1, hZ1], 2);
 
-	// check if we have anything to draw
-	if(this.back.dims) {
-		if (this.sliceType === this.sliceTypeRender) //draw rendering
-			return this.draw3D();
-		let {volScale} = this.sliceScale();
-		this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
-		this.numScreenSlices = 0;
-		if (this.sliceType === this.sliceTypeAxial) { //draw axial
-			let leftTopWidthHeight = this.scaleSlice(volScale[0], volScale[1]);
-			this.draw2D(leftTopWidthHeight, 0);
-		} else if (this.sliceType === this.sliceTypeCoronal) { //draw coronal
-			let leftTopWidthHeight = this.scaleSlice(volScale[0], volScale[2]);
-			this.draw2D(leftTopWidthHeight, 1);
-		} else if (this.sliceType === this.sliceTypeSagittal) { //draw sagittal
-			let leftTopWidthHeight = this.scaleSlice(volScale[1], volScale[2]);
-			this.draw2D(leftTopWidthHeight, 2);
-		} else { //sliceTypeMultiplanar
-			let ltwh = this.scaleSlice(volScale[0]+volScale[1], volScale[1]+volScale[2]);
-			let wX = ltwh[2] * volScale[0]/(volScale[0]+volScale[1]);
-			let ltwh3x1 = this.scaleSlice(volScale[0]+volScale[0]+volScale[1], Math.max(volScale[1],volScale[2]));
-			let wX1 = ltwh3x1[2] * volScale[0]/(volScale[0]+volScale[0]+volScale[1]);
-			if (wX1 > wX) {
-				let pixScale = (wX1 / volScale[0]);
-				let hY1 = volScale[1] * pixScale;
-				let hZ1 = volScale[2] * pixScale;
-				//draw axial
-				this.draw2D([ltwh3x1[0],ltwh3x1[1], wX1, hY1], 0);
-				//draw coronal
-				this.draw2D([ltwh3x1[0] + wX1,ltwh3x1[1], wX1, hZ1], 1);
-				//draw sagittal
-				this.draw2D([ltwh3x1[0] + wX1 + wX1,ltwh3x1[1], hY1, hZ1], 2);
-
-			} else {
-				let wY = ltwh[2] - wX;
-				let hY = ltwh[3] * volScale[1]/(volScale[1]+volScale[2]);
-				let hZ = ltwh[3] - hY;
-				//draw axial
-				this.draw2D([ltwh[0],ltwh[1]+hZ, wX, hY], 0);
-				//draw coronal
-				this.draw2D([ltwh[0],ltwh[1], wX, hZ], 1);
-				//draw sagittal
-				this.draw2D([ltwh[0]+wX,ltwh[1], wY, hZ], 2);
-				//draw colorbar (optional) // TODO currently only drawing one colorbar, there may be one per overlay + one for the background
-				var margin = this.opts.colorBarMargin * hY;
-				this.drawColorbar([ltwh[0]+wX+margin, ltwh[1] + hZ + margin, wY - margin - margin, hY * this.opts.colorbarHeight]);
-				// drawTextBelow(gl, [ltwh[0]+ wX + (wY * 0.5), ltwh[1] + hZ + margin + hY * colorbarHeight], "Syzygy"); //DEMO
-			}
+		} else {
+			let wY = ltwh[2] - wX;
+			let hY = ltwh[3] * volScale[1]/(volScale[1]+volScale[2]);
+			let hZ = ltwh[3] - hY;
+			//draw axial
+			this.draw2D([ltwh[0],ltwh[1]+hZ, wX, hY], 0);
+			//draw coronal
+			this.draw2D([ltwh[0],ltwh[1], wX, hZ], 1);
+			//draw sagittal
+			this.draw2D([ltwh[0]+wX,ltwh[1], wY, hZ], 2);
+			//draw colorbar (optional) // TODO currently only drawing one colorbar, there may be one per overlay + one for the background
+			var margin = this.opts.colorBarMargin * hY;
+			this.drawColorbar([ltwh[0]+wX+margin, ltwh[1] + hZ + margin, wY - margin - margin, hY * this.opts.colorbarHeight]);
+			// drawTextBelow(gl, [ltwh[0]+ wX + (wY * 0.5), ltwh[1] + hZ + margin + hY * colorbarHeight], "Syzygy"); //DEMO
 		}
-
-		const pos = this.frac2mm([this.scene.crosshairPos[0],this.scene.crosshairPos[1],this.scene.crosshairPos[2]]);
-		posString = pos[0].toFixed(2)+'×'+pos[1].toFixed(2)+'×'+pos[2].toFixed(2);
 	}
+	
+	//next lines can be deleted: only to demonstrate solution for issue 90 https://github.com/hanayik/niivue/issues/90
+	const pos = this.frac2mm([this.scene.crosshairPos[0],this.scene.crosshairPos[1],this.scene.crosshairPos[2]]);
+	let vox = this.frac2vox([this.scene.crosshairPos[0],this.scene.crosshairPos[1],this.scene.crosshairPos[2]]);
+	let frac = this.vox2frac(vox)
+	console.log(' fracIn', this.scene.crosshairPos,'\nvox:', vox,'\nfracOut:',frac)
+	
+	posString = pos[0].toFixed(2)+'×'+pos[1].toFixed(2)+'×'+pos[2].toFixed(2);
 	this.gl.finish();
 
 	// temporary event bus mechanism. It uses Vue, but it would be ideal to divorce vue from this gl code.
