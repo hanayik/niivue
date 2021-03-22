@@ -583,7 +583,7 @@ Niivue.prototype.calMinMaxCore = function(overlayItem, img, percentileFrac=0.02,
       if (isNaN(imgRaw[i]))
         continue
       hist[ (imgRaw[i]-mn) * scl] ++
-    }  
+    }
   } else {
     for (let i = 0; i <= nVox; i++) {
       if (isNaN(imgRaw[i]))
@@ -597,7 +597,7 @@ Niivue.prototype.calMinMaxCore = function(overlayItem, img, percentileFrac=0.02,
     n += hist[lo]
     lo++
   }
-  lo -- //remove final increment  
+  lo -- //remove final increment
   n = 0
   let hi = nBins
   while (n < n2pct) {
@@ -619,7 +619,7 @@ Niivue.prototype.calMinMaxCore = function(overlayItem, img, percentileFrac=0.02,
     } //while not ok
   } //if lo == hi
   var pct2 = intensityRaw2Scaled(hdr, (lo)/scl + mn)
-  var pct98 = intensityRaw2Scaled(hdr, (hi)/scl + mn)	
+  var pct98 = intensityRaw2Scaled(hdr, (hi)/scl + mn)
   console.log("full range %f..%f  (voxels 0 or NaN = %i) robust range %f..%f", mnScale, mxScale, nZero, pct2, pct98)
   if ((overlayItem.volume.hdr.cal_min < overlayItem.volume.hdr.cal_max) && (overlayItem.volume.hdr.cal_min >= mnScale) && (overlayItem.volume.hdr.cal_max <= mxScale)){
     console.log("ignoring robust range: using header cal_min and cal_max")
@@ -634,7 +634,7 @@ Niivue.prototype.calMinMax = function(overlayItem, img, percentileFrac=0.02, ign
 	console.log("cal_min, cal_max, global_min, global_max", minMax[0], minMax[1], minMax[2], minMax[3])
 	overlayItem.cal_min = minMax[0]
 	overlayItem.cal_max = minMax[1]
-	overlayItem.global_min = minMax[2]	
+	overlayItem.global_min = minMax[2]
 	overlayItem.global_max = minMax[3]
 } // calMinMax()
 
@@ -1015,7 +1015,7 @@ Niivue.prototype.draw3D = function() {
 	var fDistance = -0.54 * this.volScaleMultiplier;
 	//https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/depthRange
 	// default is 0..1
-	// unit cube with corner aligned 
+	// unit cube with corner aligned
 	//this.gl.depthRange(0.1, -fDistance * 3.0); //xerxes
 	//modelMatrix *= TMat4.Translate(0, 0, -fDistance);
 	mat.mat4.translate(m,m, [0, 0, fDistance]);
@@ -1025,7 +1025,7 @@ Niivue.prototype.draw3D = function() {
 	rad = (this.scene.renderAzimuth) * Math.PI / 180;
 	mat.mat4.rotate(m,m, rad, [0, 0, 1]);
 	mat.mat4.scale(m, m, volScale); // volume aspect ratio
-	
+
 	//compute ray direction
 	var inv = mat.mat4.create();
 	mat.mat4.invert(inv, m);
@@ -1074,14 +1074,14 @@ Niivue.prototype.mm2frac = function(mm ) {
 } // mm2frac()
 
 Niivue.prototype.vox2frac = function(vox) {
-	//convert from  0-index voxel space [0..dim[1]-1, 0..dim[2]-1, 0..dim[3]-1] to normalized texture space XYZ= [0..1, 0..1 ,0..1] 
+	//convert from  0-index voxel space [0..dim[1]-1, 0..dim[2]-1, 0..dim[3]-1] to normalized texture space XYZ= [0..1, 0..1 ,0..1]
 	//consider dimension with 3 voxels, the voxel centers are at 0.25, 0.5, 0.75 corresponding to 0,1,2
 	let frac = [ (vox[0]+0.5)/this.back.dims[1], (vox[1]+0.5)/this.back.dims[2], (vox[2]+0.5)/this.back.dims[3] ]
 	return frac
 } // vox2frac()
 
 Niivue.prototype.frac2vox = function(frac) {
-	//convert from normalized texture space XYZ= [0..1, 0..1 ,0..1] to 0-index voxel space [0..dim[1]-1, 0..dim[2]-1, 0..dim[3]-1] 
+	//convert from normalized texture space XYZ= [0..1, 0..1 ,0..1] to 0-index voxel space [0..dim[1]-1, 0..dim[2]-1, 0..dim[3]-1]
 	//consider dimension with 3 voxels, the voxel centers are at 0.25, 0.5, 0.75 corresponding to 0,1,2
 	let vox = [ (frac[0]*this.back.dims[1])-0.5, (frac[1]*this.back.dims[2])-0.5, (frac[2]*this.back.dims[3])-0.5 ]
 	return vox
@@ -1167,13 +1167,13 @@ Niivue.prototype.drawScene = function() {
 			// drawTextBelow(gl, [ltwh[0]+ wX + (wY * 0.5), ltwh[1] + hZ + margin + hY * colorbarHeight], "Syzygy"); //DEMO
 		}
 	}
-	
+
 	//next lines can be deleted: only to demonstrate solution for issue 90 https://github.com/hanayik/niivue/issues/90
 	const pos = this.frac2mm([this.scene.crosshairPos[0],this.scene.crosshairPos[1],this.scene.crosshairPos[2]]);
 	let vox = this.frac2vox([this.scene.crosshairPos[0],this.scene.crosshairPos[1],this.scene.crosshairPos[2]]);
 	let frac = this.vox2frac(vox)
 	console.log(' fracIn', this.scene.crosshairPos,'\nvox:', vox,'\nfracOut:',frac)
-	
+
 	posString = pos[0].toFixed(2)+'×'+pos[1].toFixed(2)+'×'+pos[2].toFixed(2);
 	this.gl.finish();
 

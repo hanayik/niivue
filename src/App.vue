@@ -126,8 +126,8 @@ export default {
   },
 
   created () {
-    bus.$on('crosshair-pos-change', (posString) => {
-    this.coordinateString = posString 
+    bus.$on('mm-change', (pos) => {
+    this.coordinateString = pos[0].toFixed(2)+'×'+pos[1].toFixed(2)+'×'+pos[2].toFixed(2);
     });
 
   },

@@ -75,6 +75,12 @@ export default {
     
       },
   methods: {
+    setNewPos: function(){
+      let newMM = this.niivue.frac2mm([this.niivue.scene.crosshairPos[0],this.niivue.scene.crosshairPos[1],this.niivue.scene.crosshairPos[2]]); 
+      bus.$emit('mm-change', newMM);
+
+    },
+
     onWindowResize: function() {
       var bottomStatusBarHeight = 100 // this is an estimate
       var canvas = document.querySelector("#gl") 
@@ -128,6 +134,7 @@ export default {
       var rect = canvas.getBoundingClientRect()
       this.niivue.mouseClick(e.clientX - rect.left, e.clientY - rect.top)
       this.niivue.mouseDown(e.clientX - rect.left,e.clientY - rect.top)
+      this.setNewPos()
     })
     
     gl.canvas.addEventListener('touchstart', (e) => {
@@ -137,6 +144,7 @@ export default {
       var rect = canvas.getBoundingClientRect()
       this.niivue.mouseClick(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
       this.niivue.mouseDown(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+      this.setNewPos()
     })
 
     
@@ -147,6 +155,7 @@ export default {
         this.niivue.mouseClick(e.clientX - rect.left, e.clientY - rect.top)
         // mouseMove if 3D render mode
         this.niivue.mouseMove(e.clientX - rect.left,e.clientY - rect.top)
+        this.setNewPos()
       }
     })
 
@@ -155,6 +164,7 @@ export default {
         var rect = canvas.getBoundingClientRect()
         this.niivue.mouseClick(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
         this.niivue.mouseMove(e.touches[0].clientX - rect.left,e.touches[0].clientY - rect.top)
+        this.setNewPos()
       }
     })
 
@@ -162,11 +172,13 @@ export default {
     gc.on('pinchin', () => {
       // scroll 2D slices 
       this.niivue.sliceScroll2D(0.001, null, null)
+      this.setNewPos()
     })
 
     gc.on('pinchout', () => {
       // scroll 2D slices 
       this.niivue.sliceScroll2D(-0.001, null, null)
+      this.setNewPos()
     })
 
     gl.canvas.addEventListener('wheel', (e) => {
@@ -184,6 +196,7 @@ export default {
         } else {
           this.niivue.sliceScroll2D(0.01, e.clientX - rect.left, e.clientY - rect.top)
         }
+        this.setNewPos()
         
       }
     })
