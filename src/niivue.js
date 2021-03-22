@@ -677,7 +677,6 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 		} else
 			outTexture = this.backTexture;
 	}
-	if (opacity < 0.01) opacity = 0.2;
 	let fb = this.gl.createFramebuffer();
 	this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fb);
 	this.gl.disable(this.gl.CULL_FACE);
