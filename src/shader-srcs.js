@@ -19,6 +19,7 @@ uniform vec3 texVox;
 uniform vec4 clipPlane;
 uniform highp sampler3D volume, overlay;
 uniform float overlays;
+uniform float backOpacity;
 in vec3 vColor;
 out vec4 fColor;
 vec3 GetBackPosition (vec3 startPosition) {
@@ -98,7 +99,7 @@ void main() {
 		if ( colAcc.a > earlyTermination )
 			break;
 	}
-	colAcc.a = colAcc.a / earlyTermination;
+	colAcc.a = (colAcc.a / earlyTermination) * backOpacity;
 	fColor = colAcc;
 	if (overlays < 1.0) return;
 	//overlay pass
@@ -181,7 +182,7 @@ void main() {
 	color = vec4(texture(volume, texPos).rgb, opacity);
 	vec4 ocolor = texture(overlay, texPos);
 	color.rgb = mix(color.rgb, ocolor.rgb, ocolor.a);
-	color.a = color.a + (ocolor.a * (1.0 - color.a)); 
+	color.a = color.a + (ocolor.a * (1.0 - color.a));
 }`;
 
 export var fragLineShader =

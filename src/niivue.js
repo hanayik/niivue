@@ -508,6 +508,10 @@ Niivue.prototype.init = async function () {
   this.gl.enable(this.gl.BLEND);
   this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
 
+  // register volume and overlay textures
+  this.rgbaTex(this.volumeTexture, this.gl.TEXTURE0, [2,2,2,2], true);
+  this.rgbaTex(this.overlayTexture, this.gl.TEXTURE2, [2,2,2,2], true);
+
   let cubeStrip = [0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0];
 	let vao = this.gl.createVertexArray();
 	this.gl.bindVertexArray(vao);
@@ -555,23 +559,14 @@ Niivue.prototype.init = async function () {
 
 Niivue.prototype.updateGLVolume = function() { //load volume or change contrast
   let visibleLayers = 0;
-
   // loop through loading volumes in this.volume
   for (let i=0; i<this.volumes.length; i++){
-	// avoid trying to refresh a volume that isn't ready
-	if(!this.volumes[i].toRAS) {
-		continue;
-	}
-
-	if(this.volumes[i].visible) {
-		this.refreshLayers(this.volumes[i], visibleLayers);
-		visibleLayers++;
-	}
-	else {
-		if(visibleLayers) {
-			this.rgbaTex(this.overlayTexture, this.gl.TEXTURE2, [2,2,2,2], true);
-		}
-	}
+    // avoid trying to refresh a volume that isn't ready
+    if(!this.volumes[i].toRAS) {
+      continue;
+    }
+    this.refreshLayers(this.volumes[i], visibleLayers);
+    visibleLayers++;
   }
 	this.drawScene();
 } // updateVolume()
@@ -600,7 +595,7 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	let img = overlayItem.volume.img
 	let opacity = overlayItem.opacity
 	let imgRaw
-	let outTexture = [];
+	let outTexture = null;
 	let mtx = [];
 	if (layer === 0) {
 		this.back = {};
@@ -991,6 +986,7 @@ Niivue.prototype.draw3D = function() {
 	//gl.cullFace(gl.FRONT);
 	this.gl.uniformMatrix4fv(this.renderShader.uniforms["mvpMtx"], false, m);
 	this.gl.uniform1f(this.renderShader.uniforms["overlays"], this.overlays);
+  this.gl.uniform1f(this.renderShader.uniforms["backOpacity"], this.volumes[0].opacity);
 	this.gl.uniform4fv(this.renderShader.uniforms["clipPlane"], this.scene.clipPlane);
 	this.gl.uniform3fv(this.renderShader.uniforms["rayDir"], rayDir);
 	this.gl.uniform3fv(this.renderShader.uniforms["texVox"], vox);
@@ -1105,7 +1101,7 @@ Niivue.prototype.drawScene = function() {
 		posString = pos[0].toFixed(2)+'×'+pos[1].toFixed(2)+'×'+pos[2].toFixed(2);
 	}
 	this.gl.finish();
-	
+
 	// temporary event bus mechanism. It uses Vue, but it would be ideal to divorce vue from this gl code.
 	//bus.$emit('crosshair-pos-change', posString);
 	return posString
