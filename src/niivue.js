@@ -1162,16 +1162,9 @@ Niivue.prototype.drawScene = function() {
 			// drawTextBelow(gl, [ltwh[0]+ wX + (wY * 0.5), ltwh[1] + hZ + margin + hY * colorbarHeight], "Syzygy"); //DEMO
 		}
 	}
-
-	//next lines can be deleted: only to demonstrate solution for issue 90 https://github.com/hanayik/niivue/issues/90
 	const pos = this.frac2mm([this.scene.crosshairPos[0],this.scene.crosshairPos[1],this.scene.crosshairPos[2]]);
-	let vox = this.frac2vox([this.scene.crosshairPos[0],this.scene.crosshairPos[1],this.scene.crosshairPos[2]]);
-	let frac = this.vox2frac(vox)
-	console.log(' fracIn', this.scene.crosshairPos,'\nvox:', vox,'\nfracOut:',frac)
-
 	posString = pos[0].toFixed(2)+'×'+pos[1].toFixed(2)+'×'+pos[2].toFixed(2);
 	this.gl.finish();
-
 	// temporary event bus mechanism. It uses Vue, but it would be ideal to divorce vue from this gl code.
 	//bus.$emit('crosshair-pos-change', posString);
 	return posString
