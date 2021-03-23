@@ -798,7 +798,6 @@ Niivue.prototype.sliceScale = function() {
   var dims = [1.0, this.back.dims[1] * this.back.pixDims[1], this.back.dims[2] * this.back.pixDims[2], this.back.dims[3] * this.back.pixDims[3]];
 	var longestAxis = Math.max(dims[1], Math.max(dims[2], dims[3]));
 	var volScale = [dims[1] / longestAxis, dims[2] / longestAxis, dims[3] / longestAxis];
-	volScale = volScale.map(function(v) {return v * this.volScaleMultiplier;}.bind(this))
 	var vox = [this.back.dims[1], this.back.dims[2], this.back.dims[3]];
 	return { volScale, vox }
 } // sliceScale()
@@ -1004,18 +1003,12 @@ Niivue.prototype.draw3D = function() {
 	let xPix = mn
 	let yPix = mn
 	this.gl.viewport(xCenter-(xPix * 0.5), yCenter - (yPix * 0.5) , xPix, yPix);
-	//console.log(mn, this.gl.canvas.width, this.gl.canvas.height)
-	/*
-	if (this.gl.canvas.width < this.gl.canvas.height) // screen aspect ratio
-		this.gl.viewport(0, (this.gl.canvas.height - this.gl.canvas.width)* 0.5, this.gl.canvas.width, this.gl.canvas.width);
-	else
-		this.gl.viewport((this.gl.canvas.width - this.gl.canvas.height)* 0.5, 0, this.gl.canvas.height, this.gl.canvas.height);*/
 	this.gl.clearColor(0.2, 0, 0, 1);
 	var m = mat.mat4.create();
-	var fDistance = -0.54 * this.volScaleMultiplier;
+	var fDistance = -0.54;
 	//https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/depthRange
 	// default is 0..1
-	// unit cube with corner aligned
+	// unit cube with corner aligned 
 	//this.gl.depthRange(0.1, -fDistance * 3.0); //xerxes
 	//modelMatrix *= TMat4.Translate(0, 0, -fDistance);
 	mat.mat4.translate(m,m, [0, 0, fDistance]);
@@ -1025,7 +1018,8 @@ Niivue.prototype.draw3D = function() {
 	rad = (this.scene.renderAzimuth) * Math.PI / 180;
 	mat.mat4.rotate(m,m, rad, [0, 0, 1]);
 	mat.mat4.scale(m, m, volScale); // volume aspect ratio
-
+	mat.mat4.scale(m, m, [0.57, 0.57, 0.57]); //unit cube has maximum 1.73
+	
 	//compute ray direction
 	var inv = mat.mat4.create();
 	mat.mat4.invert(inv, m);
@@ -1042,6 +1036,7 @@ Niivue.prototype.draw3D = function() {
 	//this.gl.disable(this.gl.DEPTH_TEST);
 	//gl.enable(gl.CULL_FACE);
 	//gl.cullFace(gl.FRONT);
+	this.gl.enable(this.gl.CULL_FACE);
 	this.gl.uniformMatrix4fv(this.renderShader.uniforms["mvpMtx"], false, m);
 	this.gl.uniform1f(this.renderShader.uniforms["overlays"], this.overlays);
   this.gl.uniform1f(this.renderShader.uniforms["backOpacity"], this.volumes[0].opacity);
