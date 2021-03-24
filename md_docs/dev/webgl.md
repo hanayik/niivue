@@ -9,14 +9,15 @@ vec2 copies of the ivec2
 
 ##### Textures
 
-The term Textures refers to bitmap images that are stored on the graphics card. The WebGL context can only have a limited number of textures active at one time (with the command `activeTexture` deterimining which textures are available). You can think of these active textures as slots that are available for the shaders to access. NiiVue consistently uses the same slots for specific textures. This means that each draw call does not need to explicitly set the active textures. Therefore, these slots should be considered reserved and not used for other functions.
+The term Textures refers to bitmap images that are stored on the graphics card. WebGL2 can support 1D, 2D, and 3D textures. The WebGL context can only have a limited number of textures active at one time (with the command `activeTexture` deterimining which textures are available). You can think of these active textures as slots that are available for the shaders to access. NiiVue consistently uses the same slots for specific textures. This means that each draw call does not need to explicitly set the active textures. Therefore, these slots should be considered reserved and not used for other functions.
 
  - TEXTURE0: Background volume. This 3D scalar bitmap stores the voxel intensities of the background image.
  - TEXTURE1: Active colormap. This 2D RGBA bitmap converts the scalar background voxel intensities to RGBA values (e.g. Grayscale, Viridis). Note that the background and each overlay can have a unique colormap, so the selectColormap() call should be used to select a specific map.
  - TEXTURE2: Overlay volumes. This 3D RGBA bitmap stores the blended values of all loaded overlays.
  - TEXTURE3: Font. This is a 2D bitmap that stores the [multi-channel signed distance field typeface](https://github.com/Chlumsky/msdfgen) 
  - TEXTURE6: Temporary 3D texture: this is used for compute shaders to reorient volumes (e.g. reformat an image from ASR to LIP orientation).
-
+ - TEXTURE7: Temporary 2D texture: this is used to blend multiple overlays into a single textire (TEXTURE2).
+ 
 ##### Color Schemes
 
 The user can choose different colormaps for displaying dark to bright voxels. In addition to grayscale, one can choose from the [viridis color palettes](https://cran.r-project.org/web/packages/viridis/vignettes/intro-to-viridis.html) (Cividis, Inferno, Plasma and Viridis) which are designed to be both salient and compatible with the most common forms of colorblindness. Since WebGL2 does not support 1D textures, these are codes as 2D bitmap textures (sampler2D, with a width of 256 pixels and a height of one pixel). This explains the GLSL definition `sampler2D colormap`, with reading using `texture(colormap, vec2(f, 0.5))` (where f is a fraction from 0..1, and 0.5 indicates sampling in the vertical middle of the bitmap).

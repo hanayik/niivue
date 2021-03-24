@@ -6,7 +6,7 @@ import { vertLineShader, fragLineShader } from "./shader-srcs.js";
 import { vertRenderShader, fragRenderShader } from "./shader-srcs.js";
 import { vertColorbarShader, fragColorbarShader } from "./shader-srcs.js";
 import { vertFontShader, fragFontShader } from "./shader-srcs.js";
-import { vertOrientShader, fragOrientShaderU, fragOrientShaderI, fragOrientShaderF, fragOrientShader} from "./shader-srcs.js";
+import { vertOrientShader, fragPassThroughShader, fragOrientShaderU, fragOrientShaderI, fragOrientShaderF, fragOrientShader} from "./shader-srcs.js";
 
 /**
  * @class Niivue
@@ -65,6 +65,7 @@ export let Niivue = function(opts={}){
   this.renderShader = null
   this.colorbarShader = null
   this.fontShader = null
+  this.passThroughShader = null
   this.orientShaderU = null
   this.orientShaderI = null
   this.orientShaderF = null
@@ -501,10 +502,13 @@ Niivue.prototype.init = async function () {
 	this.gl.uniform1i(this.fontShader.uniforms["fontTexture"], 3);
 
   // orientation shaders
+  this.passThroughShader  = new Shader(this.gl, vertOrientShader, fragPassThroughShader);
+  
+  //this.passThroughShader  = new Shader(this.gl, vertOrientShader,fragPassThroughShader);
   this.orientShaderU = new Shader(this.gl, vertOrientShader, fragOrientShaderU.concat(fragOrientShader));
-	this.orientShaderI = new Shader(this.gl, vertOrientShader, fragOrientShaderI.concat(fragOrientShader));
-	this.orientShaderF = new Shader(this.gl, vertOrientShader, fragOrientShaderF.concat(fragOrientShader));
-	await this.initText();
+  this.orientShaderI = new Shader(this.gl, vertOrientShader, fragOrientShaderI.concat(fragOrientShader));
+  this.orientShaderF = new Shader(this.gl, vertOrientShader, fragOrientShaderF.concat(fragOrientShader));
+  await this.initText();
   return this
 } // init()
 
@@ -683,7 +687,7 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	this.gl.viewport(0, 0, this.back.dims[1], this.back.dims[2]); //output in background dimensions
 	this.gl.disable(this.gl.BLEND);
 	let tempTex3D = this.gl.createTexture();
-	this.gl.activeTexture(this.gl.TEXTURE6); //Temporary Texture
+	this.gl.activeTexture(this.gl.TEXTURE6); //Temporary 3D Texture
 	this.gl.bindTexture(this.gl.TEXTURE_3D, tempTex3D);
 	this.gl.texParameteri(this.gl.TEXTURE_3D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
 	this.gl.texParameteri(this.gl.TEXTURE_3D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
@@ -722,13 +726,36 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	}
 	if (overlayItem.global_min === undefined) //only once, first time volume is loaded
 		this.calMinMax(overlayItem, imgRaw)
+	//pass through shader setup
+	let tempTex2D = this.gl.createTexture()
+	this.gl.activeTexture(this.gl.TEXTURE7) //Temporary 2D Texture
+	this.gl.bindTexture(this.gl.TEXTURE_2D, tempTex2D)
+	this.gl.texStorage2D(this.gl.TEXTURE_2D, 1, this.gl.RGBA8,  hdr.dims[1], hdr.dims[2])
+	this.gl.texParameteri(this.gl.TEXTURE_3D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST)
+	this.gl.texParameteri(this.gl.TEXTURE_3D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST)
+	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_R, this.gl.CLAMP_TO_EDGE)
+	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE)
+	//this.gl.texSubImage2D(this.gl.TEXTURE_2D, 0, 0, 0, 256, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, lut);
+	this.gl.pixelStorei( this.gl.UNPACK_ALIGNMENT, 1 )
+	let passShader = this.passThroughShader
+	passShader.use(this.gl)
+	this.gl.uniform1i(passShader.uniforms["in3D"], 2) //overlay volume
+	//let img2D = new Uint8ClampedArray(hdr.dims[1] * hdr.dims[2] * 4);
+	//console.log(img2D[0])
+	//this.gl.texSubImage2D(this.gl.TEXTURE_2D, 0, 0, 0, hdr.dims[1], hdr.dims[2], this.gl.RGBA, this.gl.UNSIGNED_BYTE, img2D);
+
+	
 	orientShader.use(this.gl);
+
 	this.selectColormap(overlayItem.colorMap)
 	this.gl.uniform1f(orientShader.uniforms["cal_min"], overlayItem.cal_min);
 	this.gl.uniform1f(orientShader.uniforms["cal_max"], overlayItem.cal_max);
 	this.gl.bindTexture(this.gl.TEXTURE_3D, tempTex3D);
 	this.gl.uniform1i(orientShader.uniforms["intensityVol"], 6);
+	this.gl.uniform1i(orientShader.uniforms["in2D"], 7);
+	
 	this.gl.uniform1i(orientShader.uniforms["colormap"], 1);
+	this.gl.uniform1f(orientShader.uniforms["layer"], layer);
 	this.gl.uniform1f(orientShader.uniforms["scl_inter"], hdr.scl_inter);
 	this.gl.uniform1f(orientShader.uniforms["scl_slope"],hdr.scl_slope);
 	this.gl.uniform1f(orientShader.uniforms["opacity"], opacity);
@@ -736,6 +763,13 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	for (let i = 0; i < (this.back.dims[3]); i++) { //output slices
 		//if ((layer > 1) && (((i+layer) % 2) === 0)) continue;
 		var coordZ = 1/this.back.dims[3] * (i + 0.5);
+		if (layer > 1) { //use pass-through shader to copy previous color to temporary 2D texture
+			passShader.use(this.gl)
+			this.gl.uniform1f(passShader.uniforms["coordZ"], coordZ)
+			this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0,this.gl.TEXTURE_2D, tempTex2D, 0)
+			this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 5, 4);
+			orientShader.use(this.gl);
+		}
 		this.gl.uniform1f(orientShader.uniforms["coordZ"], coordZ);
 		this.gl.framebufferTextureLayer(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, outTexture, 0, i);
 		if (layer <= 1) //layer 0 (background) and leyer 1 (1st overlay) only!
@@ -743,6 +777,7 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 		this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 5, 4);
 	}
 	this.gl.deleteTexture(tempTex3D);
+	this.gl.deleteTexture(tempTex2D);
 	this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
 	this.gl.deleteFramebuffer(fb);
 } // refreshLayers()
@@ -768,6 +803,7 @@ Niivue.prototype.selectColormap = function(lutName = "") {
 	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
 	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_R, this.gl.CLAMP_TO_EDGE);
 	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+	this.gl.pixelStorei( this.gl.UNPACK_ALIGNMENT, 1 )
 	this.gl.texSubImage2D(this.gl.TEXTURE_2D, 0, 0, 0, 256, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, lut);
   return this
 } // selectColormap()
