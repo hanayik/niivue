@@ -6,7 +6,7 @@ import { vertLineShader, fragLineShader } from "./shader-srcs.js";
 import { vertRenderShader, fragRenderShader } from "./shader-srcs.js";
 import { vertColorbarShader, fragColorbarShader } from "./shader-srcs.js";
 import { vertFontShader, fragFontShader } from "./shader-srcs.js";
-import { vertOrientShader, fragOrientShaderU, fragOrientShaderI, fragOrientShaderF, fragOrientShader} from "./shader-srcs.js";
+import { vertOrientShader, fragPassThroughShader, fragOrientShaderU, fragOrientShaderI, fragOrientShaderF, fragOrientShader} from "./shader-srcs.js";
 
 /**
  * @class Niivue
@@ -65,6 +65,7 @@ export let Niivue = function(opts={}){
   this.renderShader = null
   this.colorbarShader = null
   this.fontShader = null
+  this.passThroughShader = null
   this.orientShaderU = null
   this.orientShaderI = null
   this.orientShaderF = null
@@ -501,10 +502,13 @@ Niivue.prototype.init = async function () {
 	this.gl.uniform1i(this.fontShader.uniforms["fontTexture"], 3);
 
   // orientation shaders
+  this.passThroughShader  = new Shader(this.gl, vertOrientShader, fragPassThroughShader);
+  
+  //this.passThroughShader  = new Shader(this.gl, vertOrientShader,fragPassThroughShader);
   this.orientShaderU = new Shader(this.gl, vertOrientShader, fragOrientShaderU.concat(fragOrientShader));
-	this.orientShaderI = new Shader(this.gl, vertOrientShader, fragOrientShaderI.concat(fragOrientShader));
-	this.orientShaderF = new Shader(this.gl, vertOrientShader, fragOrientShaderF.concat(fragOrientShader));
-	await this.initText();
+  this.orientShaderI = new Shader(this.gl, vertOrientShader, fragOrientShaderI.concat(fragOrientShader));
+  this.orientShaderF = new Shader(this.gl, vertOrientShader, fragOrientShaderF.concat(fragOrientShader));
+  await this.initText();
   return this
 } // init()
 
@@ -683,7 +687,7 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	this.gl.viewport(0, 0, this.back.dims[1], this.back.dims[2]); //output in background dimensions
 	this.gl.disable(this.gl.BLEND);
 	let tempTex3D = this.gl.createTexture();
-	this.gl.activeTexture(this.gl.TEXTURE6); //Temporary Texture
+	this.gl.activeTexture(this.gl.TEXTURE6); //Temporary 3D Texture
 	this.gl.bindTexture(this.gl.TEXTURE_3D, tempTex3D);
 	this.gl.texParameteri(this.gl.TEXTURE_3D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
 	this.gl.texParameteri(this.gl.TEXTURE_3D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
@@ -722,13 +726,36 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	}
 	if (overlayItem.global_min === undefined) //only once, first time volume is loaded
 		this.calMinMax(overlayItem, imgRaw)
+	//pass through shader setup
+	let tempTex2D = this.gl.createTexture()
+	this.gl.activeTexture(this.gl.TEXTURE7) //Temporary 2D Texture
+	this.gl.bindTexture(this.gl.TEXTURE_2D, tempTex2D)
+	this.gl.texStorage2D(this.gl.TEXTURE_2D, 1, this.gl.RGBA8,  hdr.dims[1], hdr.dims[2])
+	this.gl.texParameteri(this.gl.TEXTURE_3D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST)
+	this.gl.texParameteri(this.gl.TEXTURE_3D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST)
+	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_R, this.gl.CLAMP_TO_EDGE)
+	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE)
+	//this.gl.texSubImage2D(this.gl.TEXTURE_2D, 0, 0, 0, 256, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, lut);
+	this.gl.pixelStorei( this.gl.UNPACK_ALIGNMENT, 1 )
+	let passShader = this.passThroughShader
+	passShader.use(this.gl)
+	this.gl.uniform1i(passShader.uniforms["in3D"], 2) //overlay volume
+	//let img2D = new Uint8ClampedArray(hdr.dims[1] * hdr.dims[2] * 4);
+	//console.log(img2D[0])
+	//this.gl.texSubImage2D(this.gl.TEXTURE_2D, 0, 0, 0, hdr.dims[1], hdr.dims[2], this.gl.RGBA, this.gl.UNSIGNED_BYTE, img2D);
+
+	
 	orientShader.use(this.gl);
+
 	this.selectColormap(overlayItem.colorMap)
 	this.gl.uniform1f(orientShader.uniforms["cal_min"], overlayItem.cal_min);
 	this.gl.uniform1f(orientShader.uniforms["cal_max"], overlayItem.cal_max);
 	this.gl.bindTexture(this.gl.TEXTURE_3D, tempTex3D);
 	this.gl.uniform1i(orientShader.uniforms["intensityVol"], 6);
+	this.gl.uniform1i(orientShader.uniforms["in2D"], 7);
+	
 	this.gl.uniform1i(orientShader.uniforms["colormap"], 1);
+	this.gl.uniform1f(orientShader.uniforms["layer"], layer);
 	this.gl.uniform1f(orientShader.uniforms["scl_inter"], hdr.scl_inter);
 	this.gl.uniform1f(orientShader.uniforms["scl_slope"],hdr.scl_slope);
 	this.gl.uniform1f(orientShader.uniforms["opacity"], opacity);
@@ -736,6 +763,13 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	for (let i = 0; i < (this.back.dims[3]); i++) { //output slices
 		//if ((layer > 1) && (((i+layer) % 2) === 0)) continue;
 		var coordZ = 1/this.back.dims[3] * (i + 0.5);
+		if (layer > 1) { //use pass-through shader to copy previous color to temporary 2D texture
+			passShader.use(this.gl)
+			this.gl.uniform1f(passShader.uniforms["coordZ"], coordZ)
+			this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0,this.gl.TEXTURE_2D, tempTex2D, 0)
+			this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 5, 4);
+			orientShader.use(this.gl);
+		}
 		this.gl.uniform1f(orientShader.uniforms["coordZ"], coordZ);
 		this.gl.framebufferTextureLayer(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, outTexture, 0, i);
 		if (layer <= 1) //layer 0 (background) and leyer 1 (1st overlay) only!
@@ -743,6 +777,7 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 		this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 5, 4);
 	}
 	this.gl.deleteTexture(tempTex3D);
+	this.gl.deleteTexture(tempTex2D);
 	this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
 	this.gl.deleteFramebuffer(fb);
 } // refreshLayers()
@@ -768,6 +803,7 @@ Niivue.prototype.selectColormap = function(lutName = "") {
 	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
 	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_R, this.gl.CLAMP_TO_EDGE);
 	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+	this.gl.pixelStorei( this.gl.UNPACK_ALIGNMENT, 1 )
 	this.gl.texSubImage2D(this.gl.TEXTURE_2D, 0, 0, 0, 256, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, lut);
   return this
 } // selectColormap()
@@ -798,7 +834,6 @@ Niivue.prototype.sliceScale = function() {
   var dims = [1.0, this.back.dims[1] * this.back.pixDims[1], this.back.dims[2] * this.back.pixDims[2], this.back.dims[3] * this.back.pixDims[3]];
 	var longestAxis = Math.max(dims[1], Math.max(dims[2], dims[3]));
 	var volScale = [dims[1] / longestAxis, dims[2] / longestAxis, dims[3] / longestAxis];
-	volScale = volScale.map(function(v) {return v * this.volScaleMultiplier;}.bind(this))
 	var vox = [this.back.dims[1], this.back.dims[2], this.back.dims[3]];
 	return { volScale, vox }
 } // sliceScale()
@@ -1004,18 +1039,12 @@ Niivue.prototype.draw3D = function() {
 	let xPix = mn
 	let yPix = mn
 	this.gl.viewport(xCenter-(xPix * 0.5), yCenter - (yPix * 0.5) , xPix, yPix);
-	//console.log(mn, this.gl.canvas.width, this.gl.canvas.height)
-	/*
-	if (this.gl.canvas.width < this.gl.canvas.height) // screen aspect ratio
-		this.gl.viewport(0, (this.gl.canvas.height - this.gl.canvas.width)* 0.5, this.gl.canvas.width, this.gl.canvas.width);
-	else
-		this.gl.viewport((this.gl.canvas.width - this.gl.canvas.height)* 0.5, 0, this.gl.canvas.height, this.gl.canvas.height);*/
 	this.gl.clearColor(0.2, 0, 0, 1);
 	var m = mat.mat4.create();
-	var fDistance = -0.54 * this.volScaleMultiplier;
+	var fDistance = -0.54;
 	//https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/depthRange
 	// default is 0..1
-	// unit cube with corner aligned
+	// unit cube with corner aligned 
 	//this.gl.depthRange(0.1, -fDistance * 3.0); //xerxes
 	//modelMatrix *= TMat4.Translate(0, 0, -fDistance);
 	mat.mat4.translate(m,m, [0, 0, fDistance]);
@@ -1025,7 +1054,8 @@ Niivue.prototype.draw3D = function() {
 	rad = (this.scene.renderAzimuth) * Math.PI / 180;
 	mat.mat4.rotate(m,m, rad, [0, 0, 1]);
 	mat.mat4.scale(m, m, volScale); // volume aspect ratio
-
+	mat.mat4.scale(m, m, [0.57, 0.57, 0.57]); //unit cube has maximum 1.73
+	
 	//compute ray direction
 	var inv = mat.mat4.create();
 	mat.mat4.invert(inv, m);
@@ -1042,6 +1072,7 @@ Niivue.prototype.draw3D = function() {
 	//this.gl.disable(this.gl.DEPTH_TEST);
 	//gl.enable(gl.CULL_FACE);
 	//gl.cullFace(gl.FRONT);
+	this.gl.enable(this.gl.CULL_FACE);
 	this.gl.uniformMatrix4fv(this.renderShader.uniforms["mvpMtx"], false, m);
 	this.gl.uniform1f(this.renderShader.uniforms["overlays"], this.overlays);
   this.gl.uniform1f(this.renderShader.uniforms["backOpacity"], this.volumes[0].opacity);
@@ -1167,16 +1198,9 @@ Niivue.prototype.drawScene = function() {
 			// drawTextBelow(gl, [ltwh[0]+ wX + (wY * 0.5), ltwh[1] + hZ + margin + hY * colorbarHeight], "Syzygy"); //DEMO
 		}
 	}
-
-	//next lines can be deleted: only to demonstrate solution for issue 90 https://github.com/hanayik/niivue/issues/90
 	const pos = this.frac2mm([this.scene.crosshairPos[0],this.scene.crosshairPos[1],this.scene.crosshairPos[2]]);
-	let vox = this.frac2vox([this.scene.crosshairPos[0],this.scene.crosshairPos[1],this.scene.crosshairPos[2]]);
-	let frac = this.vox2frac(vox)
-	console.log(' fracIn', this.scene.crosshairPos,'\nvox:', vox,'\nfracOut:',frac)
-
 	posString = pos[0].toFixed(2)+'×'+pos[1].toFixed(2)+'×'+pos[2].toFixed(2);
 	this.gl.finish();
-
 	// temporary event bus mechanism. It uses Vue, but it would be ideal to divorce vue from this gl code.
 	//bus.$emit('crosshair-pos-change', posString);
 	return posString

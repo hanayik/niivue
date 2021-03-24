@@ -313,11 +313,13 @@ precision highp float;
 in vec2 TexCoord;
 out vec4 FragColor;
 uniform float coordZ;
+uniform float layer;
 uniform float scl_slope;
 uniform float scl_inter;
 uniform float cal_max;
 uniform float cal_min;
 uniform highp sampler2D colormap;
+uniform highp sampler2D in2D;
 uniform float opacity;
 uniform mat4 mtx;
 void main(void) {
@@ -328,5 +330,22 @@ void main(void) {
  f = mix(0.0, 1.0, (f - mn) / r);
  FragColor = texture(colormap, vec2(f, 0.5)).rgba;
  FragColor.a *= opacity;
- //if (f <= 0.0) FragColor.a = 1.0;
-}`;
+ if (layer < 2.0) return;
+ vec4 prevColor = texture(in2D, TexCoord);
+ FragColor.rgb = mix(FragColor.rgb, prevColor.rgb, FragColor.a);
+ FragColor.a += ((1.0 - FragColor.a) * prevColor.a);
+}`; 
+
+export var fragPassThroughShader =
+`#version 300 es
+precision highp int;
+precision highp float;
+in vec2 TexCoord;
+out vec4 FragColor;
+uniform float coordZ;
+uniform highp sampler3D in3D;
+void main(void) {
+ //FragColor = texture(in3D, vec3(TexCoord.xy, coordZ));
+ FragColor = vec4(TexCoord.x, TexCoord.y, 1.0, 0.9);
+}`; 
+
