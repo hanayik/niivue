@@ -734,30 +734,29 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 
 	//blend texture
 	let blendTexture = null;
-	blendTexture = this.rgbaTex(blendTexture, this.gl.TEXTURE5, this.back.dims);
-	this.gl.bindTexture(this.gl.TEXTURE_3D, blendTexture);
+
 	if (layer > 1) { //use pass-through shader to copy previous color to temporary 2D texture
-        let passShader = this.passThroughShader
+		blendTexture = this.rgbaTex(blendTexture, this.gl.TEXTURE5, this.back.dims);
+		this.gl.bindTexture(this.gl.TEXTURE_3D, blendTexture);
+		let passShader = this.passThroughShader
         passShader.use(this.gl);
         this.gl.uniform1i(passShader.uniforms["in3D"], 2) //overlay volume
         for (let i = 0; i < (this.back.dims[3]); i++) { //output slices
             let coordZ = 1/this.back.dims[3] * (i + 0.5);
             this.gl.uniform1f(passShader.uniforms["coordZ"], coordZ);
             this.gl.framebufferTextureLayer(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, blendTexture, 0, i);
-            this.gl.clear(this.gl.DEPTH_BUFFER_BIT); //only for background and first overlay!
+            //this.gl.clear(this.gl.DEPTH_BUFFER_BIT); //exhaustive, so not required
             this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 5, 4);
         }
-	}	
-	
+	} else
+		blendTexture = this.rgbaTex(blendTexture, this.gl.TEXTURE5, [2,2,2,2]);		
 	orientShader.use(this.gl);
-
 	this.selectColormap(overlayItem.colorMap)
 	this.gl.uniform1f(orientShader.uniforms["cal_min"], overlayItem.cal_min);
 	this.gl.uniform1f(orientShader.uniforms["cal_max"], overlayItem.cal_max);
 	this.gl.bindTexture(this.gl.TEXTURE_3D, tempTex3D);
 	this.gl.uniform1i(orientShader.uniforms["intensityVol"], 6);
 	this.gl.uniform1i(orientShader.uniforms["blend3D"], 5);
-	
 	this.gl.uniform1i(orientShader.uniforms["colormap"], 1);
 	this.gl.uniform1f(orientShader.uniforms["layer"], layer);
 	this.gl.uniform1f(orientShader.uniforms["scl_inter"], hdr.scl_inter);
@@ -768,8 +767,7 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 		let coordZ = 1/this.back.dims[3] * (i + 0.5);
 		this.gl.uniform1f(orientShader.uniforms["coordZ"], coordZ);
 		this.gl.framebufferTextureLayer(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, outTexture, 0, i);
-		//if (layer <= 1) //layer 0 (background) and leyer 1 (1st overlay) only!
-			this.gl.clear(this.gl.DEPTH_BUFFER_BIT); //only for background and first overlay!
+		//this.gl.clear(this.gl.DEPTH_BUFFER_BIT); //exhaustive, so not required
 		this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 5, 4);
 	}
 	this.gl.deleteTexture(tempTex3D);
