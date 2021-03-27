@@ -323,6 +323,7 @@ uniform highp sampler2D in2D;
 uniform float opacity;
 uniform mat4 mtx;
 void main(void) {
+ FragColor = texture(in2D, TexCoord); return;
  vec4 vx = vec4(TexCoord.xy, coordZ, 1.0) * mtx;
  float f = (scl_slope * float(texture(intensityVol, vx.xyz).r)) + scl_inter;
  float r = max(0.00001, abs(cal_max - cal_min));
@@ -331,10 +332,32 @@ void main(void) {
  FragColor = texture(colormap, vec2(f, 0.5)).rgba;
  FragColor.a *= opacity;
  if (layer < 2.0) return;
- vec4 prevColor = texture(in2D, TexCoord);
- FragColor.rgb = mix(FragColor.rgb, prevColor.rgb, FragColor.a);
- FragColor.a += ((1.0 - FragColor.a) * prevColor.a);
+ //vec4 prevColor = texture(in2D, TexCoord);
+ //vec4 prevColor = texture(in2D, vec2(TexCoord.x, TexCoord.y));
+ vec4 prevColor = texture(in2D, vec2(TexCoord.x, TexCoord.y));
+ //vec4 prevColor = vec4(0.3, 0.0, 0.0, 1.0);
+ //FragColor.rgb = mix(FragColor.rgb, prevColor.rgb, FragColor.a);
+ //FragColor.a += ((1.0 - FragColor.a) * prevColor.a);
+ prevColor.a = 0.6;
+ //prevColor.b = TexCoord.x;
+ if (TexCoord.x < 0.25) prevColor.b = 1.0; 
+ if (TexCoord.x > 0.75) prevColor.b = 1.0; 
+ if (TexCoord.y < 0.25) prevColor.b = 0.8; 
+ if (TexCoord.y > 0.75) prevColor.b = 0.8; 
+ FragColor = prevColor;
 }`; 
+
+export var vertPassThroughShader =
+`#version 300 es
+#line 283
+precision highp int;
+precision highp float;
+in vec3 vPos;
+out vec2 TexCoord;
+void main() {
+    TexCoord = vPos.xy;
+    gl_Position = vec4(vPos.x, vPos.y, 0.0, 1.0);
+}`;
 
 export var fragPassThroughShader =
 `#version 300 es
@@ -346,6 +369,13 @@ uniform float coordZ;
 uniform highp sampler3D in3D;
 void main(void) {
  //FragColor = texture(in3D, vec3(TexCoord.xy, coordZ));
- FragColor = vec4(TexCoord.x, TexCoord.y, 1.0, 0.9);
+ float x = 0.0;
+ if (TexCoord.x <= 0.1) x = 0.5;
+ if (TexCoord.x >= 0.9) x = 1.0;
+
+ float y = 0.0;
+ if (TexCoord.y <= 0.1) y = 0.5;
+ if (TexCoord.y >= 0.9) y = 1.0;
+ FragColor = vec4(x, y, coordZ, 0.9);
 }`; 
 

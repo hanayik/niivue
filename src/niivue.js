@@ -6,7 +6,7 @@ import { vertLineShader, fragLineShader } from "./shader-srcs.js";
 import { vertRenderShader, fragRenderShader } from "./shader-srcs.js";
 import { vertColorbarShader, fragColorbarShader } from "./shader-srcs.js";
 import { vertFontShader, fragFontShader } from "./shader-srcs.js";
-import { vertOrientShader, fragPassThroughShader, fragOrientShaderU, fragOrientShaderI, fragOrientShaderF, fragOrientShader} from "./shader-srcs.js";
+import { vertOrientShader, vertPassThroughShader, fragPassThroughShader, fragOrientShaderU, fragOrientShaderI, fragOrientShaderF, fragOrientShader} from "./shader-srcs.js";
 
 /**
  * @class Niivue
@@ -502,7 +502,7 @@ Niivue.prototype.init = async function () {
 	this.gl.uniform1i(this.fontShader.uniforms["fontTexture"], 3);
 
   // orientation shaders
-  this.passThroughShader  = new Shader(this.gl, vertOrientShader, fragPassThroughShader);
+  this.passThroughShader  = new Shader(this.gl, vertPassThroughShader, fragPassThroughShader);
   
   //this.passThroughShader  = new Shader(this.gl, vertOrientShader,fragPassThroughShader);
   this.orientShaderU = new Shader(this.gl, vertOrientShader, fragOrientShaderU.concat(fragOrientShader));
@@ -681,6 +681,10 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 		} else
 			outTexture = this.backTexture;
 	}
+	let fb2 = this.gl.createFramebuffer();
+	this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fb2);
+	this.gl.disable(this.gl.CULL_FACE);
+	//fb
 	let fb = this.gl.createFramebuffer();
 	this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fb);
 	this.gl.disable(this.gl.CULL_FACE);
@@ -730,9 +734,16 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	let tempTex2D = this.gl.createTexture()
 	this.gl.activeTexture(this.gl.TEXTURE7) //Temporary 2D Texture
 	this.gl.bindTexture(this.gl.TEXTURE_2D, tempTex2D)
-	this.gl.texStorage2D(this.gl.TEXTURE_2D, 1, this.gl.RGBA8,  hdr.dims[1], hdr.dims[2])
-	this.gl.texParameteri(this.gl.TEXTURE_3D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST)
-	this.gl.texParameteri(this.gl.TEXTURE_3D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST)
+	const level = 0;
+	const internalFormat = this.gl.RGBA;
+	const border = 0;
+	const format = this.gl.RGBA;
+	const type = this.gl.UNSIGNED_BYTE;
+	const data = null;
+	this.gl.texImage2D(this.gl.TEXTURE_2D, level, internalFormat,hdr.dims[1], hdr.dims[2], border,format, type, data);
+	//this.gl.texStorage2D(this.gl.TEXTURE_2D, 1, this.gl.RGBA8,  hdr.dims[1], hdr.dims[2])
+	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST)
+	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST)
 	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_R, this.gl.CLAMP_TO_EDGE)
 	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE)
 	//this.gl.texSubImage2D(this.gl.TEXTURE_2D, 0, 0, 0, 256, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, lut);
@@ -762,17 +773,23 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	this.gl.uniformMatrix4fv(orientShader.uniforms["mtx"], false, mtx)
 	for (let i = 0; i < (this.back.dims[3]); i++) { //output slices
 		//if ((layer > 1) && (((i+layer) % 2) === 0)) continue;
+		//fb >>>> https://webglfundamentals.org/webgl/lessons/webgl-render-to-texture.html
+		
 		var coordZ = 1/this.back.dims[3] * (i + 0.5);
 		if (layer > 1) { //use pass-through shader to copy previous color to temporary 2D texture
+			this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fb2);
 			passShader.use(this.gl)
 			this.gl.uniform1f(passShader.uniforms["coordZ"], coordZ)
 			this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0,this.gl.TEXTURE_2D, tempTex2D, 0)
+			//this.gl.framebufferTextureLayer(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, tempTex2D, 0, 1);
 			this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 5, 4);
+			this.gl.finish();
 			orientShader.use(this.gl);
+			this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fb);
 		}
 		this.gl.uniform1f(orientShader.uniforms["coordZ"], coordZ);
 		this.gl.framebufferTextureLayer(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, outTexture, 0, i);
-		if (layer <= 1) //layer 0 (background) and leyer 1 (1st overlay) only!
+		//if (layer <= 1) //layer 0 (background) and leyer 1 (1st overlay) only!
 			this.gl.clear(this.gl.DEPTH_BUFFER_BIT); //only for background and first overlay!
 		this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 5, 4);
 	}
@@ -780,6 +797,7 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	this.gl.deleteTexture(tempTex2D);
 	this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
 	this.gl.deleteFramebuffer(fb);
+	this.gl.deleteFramebuffer(fb2);
 } // refreshLayers()
 
 Niivue.prototype.selectColormap = function(lutName = "") {

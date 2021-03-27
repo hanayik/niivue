@@ -145,9 +145,9 @@ export default {
       overlayList: [
       // first item is brackground image
         {
-          url: "./LAS.nii.gz",//"./RAS.nii.gz", "./spm152.nii.gz",
+          url: "./RAS.nii.gz",//"./RAS.nii.gz", "./spm152.nii.gz",
           volume: {hdr: null, img: null},
-          name: "LAS.nii.gz",
+          name: "RAS.nii.gz",
           intensityMin: 0, // not used yet
           intensityMax: 100, // not used yet
           intensityRange:[0, 100], // not used yet
@@ -159,6 +159,17 @@ export default {
           url: "./hippo.nii.gz",
           volume: {hdr: null, img: null},
           name: "hippo.nii.gz",
+          intensityMin: 0, // not used yet
+          intensityMax: 100, // not used yet
+          intensityRange:[0, 100], // not used yet
+          colorMap: "Winter",
+          opacity: 100,
+          visible: true,
+        },
+        {
+          url: "./hippolr.nii.gz",
+          volume: {hdr: null, img: null},
+          name: "hippolr.nii.gz",
           intensityMin: 0, // not used yet
           intensityMax: 100, // not used yet
           intensityRange:[0, 100], // not used yet
