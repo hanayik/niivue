@@ -648,6 +648,7 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	let opacity = overlayItem.opacity
 	let imgRaw
 	let outTexture = null;
+
 	let mtx = [];
 	if (layer === 0) {
 		this.back = {};
@@ -681,9 +682,9 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 		} else
 			outTexture = this.backTexture;
 	}
-	let fb2 = this.gl.createFramebuffer();
-	this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fb2);
-	this.gl.disable(this.gl.CULL_FACE);
+
+	
+
 	//fb
 	let fb = this.gl.createFramebuffer();
 	this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fb);
@@ -730,31 +731,23 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	}
 	if (overlayItem.global_min === undefined) //only once, first time volume is loaded
 		this.calMinMax(overlayItem, imgRaw)
-	//pass through shader setup
-	let tempTex2D = this.gl.createTexture()
-	this.gl.activeTexture(this.gl.TEXTURE7) //Temporary 2D Texture
-	this.gl.bindTexture(this.gl.TEXTURE_2D, tempTex2D)
-	const level = 0;
-	const internalFormat = this.gl.RGBA;
-	const border = 0;
-	const format = this.gl.RGBA;
-	const type = this.gl.UNSIGNED_BYTE;
-	const data = null;
-	this.gl.texImage2D(this.gl.TEXTURE_2D, level, internalFormat,hdr.dims[1], hdr.dims[2], border,format, type, data);
-	//this.gl.texStorage2D(this.gl.TEXTURE_2D, 1, this.gl.RGBA8,  hdr.dims[1], hdr.dims[2])
-	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST)
-	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST)
-	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_R, this.gl.CLAMP_TO_EDGE)
-	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE)
-	//this.gl.texSubImage2D(this.gl.TEXTURE_2D, 0, 0, 0, 256, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, lut);
-	this.gl.pixelStorei( this.gl.UNPACK_ALIGNMENT, 1 )
-	let passShader = this.passThroughShader
-	passShader.use(this.gl)
-	this.gl.uniform1i(passShader.uniforms["in3D"], 2) //overlay volume
-	//let img2D = new Uint8ClampedArray(hdr.dims[1] * hdr.dims[2] * 4);
-	//console.log(img2D[0])
-	//this.gl.texSubImage2D(this.gl.TEXTURE_2D, 0, 0, 0, hdr.dims[1], hdr.dims[2], this.gl.RGBA, this.gl.UNSIGNED_BYTE, img2D);
 
+	//blend texture
+	let blendTexture = null;
+	blendTexture = this.rgbaTex(blendTexture, this.gl.TEXTURE5, this.back.dims);
+	this.gl.bindTexture(this.gl.TEXTURE_3D, blendTexture);
+	if (layer > 1) { //use pass-through shader to copy previous color to temporary 2D texture
+        let passShader = this.passThroughShader
+        passShader.use(this.gl);
+        this.gl.uniform1i(passShader.uniforms["in3D"], 2) //overlay volume
+        for (let i = 0; i < (this.back.dims[3]); i++) { //output slices
+            let coordZ = 1/this.back.dims[3] * (i + 0.5);
+            this.gl.uniform1f(passShader.uniforms["coordZ"], coordZ);
+            this.gl.framebufferTextureLayer(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, blendTexture, 0, i);
+            this.gl.clear(this.gl.DEPTH_BUFFER_BIT); //only for background and first overlay!
+            this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 5, 4);
+        }
+	}	
 	
 	orientShader.use(this.gl);
 
@@ -763,7 +756,7 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	this.gl.uniform1f(orientShader.uniforms["cal_max"], overlayItem.cal_max);
 	this.gl.bindTexture(this.gl.TEXTURE_3D, tempTex3D);
 	this.gl.uniform1i(orientShader.uniforms["intensityVol"], 6);
-	this.gl.uniform1i(orientShader.uniforms["in2D"], 7);
+	this.gl.uniform1i(orientShader.uniforms["blend3D"], 5);
 	
 	this.gl.uniform1i(orientShader.uniforms["colormap"], 1);
 	this.gl.uniform1f(orientShader.uniforms["layer"], layer);
@@ -772,21 +765,7 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	this.gl.uniform1f(orientShader.uniforms["opacity"], opacity);
 	this.gl.uniformMatrix4fv(orientShader.uniforms["mtx"], false, mtx)
 	for (let i = 0; i < (this.back.dims[3]); i++) { //output slices
-		//if ((layer > 1) && (((i+layer) % 2) === 0)) continue;
-		//fb >>>> https://webglfundamentals.org/webgl/lessons/webgl-render-to-texture.html
-		
-		var coordZ = 1/this.back.dims[3] * (i + 0.5);
-		if (layer > 1) { //use pass-through shader to copy previous color to temporary 2D texture
-			this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fb2);
-			passShader.use(this.gl)
-			this.gl.uniform1f(passShader.uniforms["coordZ"], coordZ)
-			this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0,this.gl.TEXTURE_2D, tempTex2D, 0)
-			//this.gl.framebufferTextureLayer(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, tempTex2D, 0, 1);
-			this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 5, 4);
-			this.gl.finish();
-			orientShader.use(this.gl);
-			this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fb);
-		}
+		let coordZ = 1/this.back.dims[3] * (i + 0.5);
 		this.gl.uniform1f(orientShader.uniforms["coordZ"], coordZ);
 		this.gl.framebufferTextureLayer(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, outTexture, 0, i);
 		//if (layer <= 1) //layer 0 (background) and leyer 1 (1st overlay) only!
@@ -794,10 +773,10 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 		this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 5, 4);
 	}
 	this.gl.deleteTexture(tempTex3D);
-	this.gl.deleteTexture(tempTex2D);
+	this.gl.deleteTexture(blendTexture);
 	this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
 	this.gl.deleteFramebuffer(fb);
-	this.gl.deleteFramebuffer(fb2);
+
 } // refreshLayers()
 
 Niivue.prototype.selectColormap = function(lutName = "") {

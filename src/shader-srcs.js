@@ -288,7 +288,7 @@ in vec3 vPos;
 out vec2 TexCoord;
 void main() {
     TexCoord = vPos.xy;
-    gl_Position = vec4( (vPos.xy-vec2(0.5,0.5))* 2.0, 0.0, 1.0);
+    gl_Position = vec4( (vPos.xy-vec2(0.5,0.5)) * 2.0, 0.0, 1.0);
 }`;
 
 export var fragOrientShaderU =
@@ -319,11 +319,10 @@ uniform float scl_inter;
 uniform float cal_max;
 uniform float cal_min;
 uniform highp sampler2D colormap;
-uniform highp sampler2D in2D;
+uniform lowp sampler3D blend3D;
 uniform float opacity;
 uniform mat4 mtx;
 void main(void) {
- FragColor = texture(in2D, TexCoord); return;
  vec4 vx = vec4(TexCoord.xy, coordZ, 1.0) * mtx;
  float f = (scl_slope * float(texture(intensityVol, vx.xyz).r)) + scl_inter;
  float r = max(0.00001, abs(cal_max - cal_min));
@@ -332,19 +331,16 @@ void main(void) {
  FragColor = texture(colormap, vec2(f, 0.5)).rgba;
  FragColor.a *= opacity;
  if (layer < 2.0) return;
- //vec4 prevColor = texture(in2D, TexCoord);
- //vec4 prevColor = texture(in2D, vec2(TexCoord.x, TexCoord.y));
- vec4 prevColor = texture(in2D, vec2(TexCoord.x, TexCoord.y));
- //vec4 prevColor = vec4(0.3, 0.0, 0.0, 1.0);
- //FragColor.rgb = mix(FragColor.rgb, prevColor.rgb, FragColor.a);
- //FragColor.a += ((1.0 - FragColor.a) * prevColor.a);
- prevColor.a = 0.6;
+ vec2 texXY = TexCoord.xy*0.5 +vec2(0.5,0.5);
+ vec4 blendColor = texture(blend3D, vec3(texXY, coordZ));
+ //prevColor.a = 0.6;
  //prevColor.b = TexCoord.x;
- if (TexCoord.x < 0.25) prevColor.b = 1.0; 
- if (TexCoord.x > 0.75) prevColor.b = 1.0; 
- if (TexCoord.y < 0.25) prevColor.b = 0.8; 
- if (TexCoord.y > 0.75) prevColor.b = 0.8; 
- FragColor = prevColor;
+ //if (TexCoord.x < 0.25) prevColor.b = 1.0; 
+ //if (TexCoord.x > 0.75) prevColor.b = 1.0; 
+ //if (TexCoord.y < 0.25) prevColor.b = 0.8; 
+ //if (TexCoord.y > 0.75) prevColor.b = 0.8; 
+ FragColor.rgb = mix(FragColor.rgb, blendColor.rgb, blendColor.a);
+ FragColor.a += (1.0 - FragColor.a) * blendColor.a;
 }`; 
 
 export var vertPassThroughShader =
@@ -366,16 +362,8 @@ precision highp float;
 in vec2 TexCoord;
 out vec4 FragColor;
 uniform float coordZ;
-uniform highp sampler3D in3D;
+uniform lowp sampler3D in3D;
 void main(void) {
- //FragColor = texture(in3D, vec3(TexCoord.xy, coordZ));
- float x = 0.0;
- if (TexCoord.x <= 0.1) x = 0.5;
- if (TexCoord.x >= 0.9) x = 1.0;
-
- float y = 0.0;
- if (TexCoord.y <= 0.1) y = 0.5;
- if (TexCoord.y >= 0.9) y = 1.0;
- FragColor = vec4(x, y, coordZ, 0.9);
+ FragColor = texture(in3D, vec3(TexCoord.xy, coordZ));
 }`; 
 
