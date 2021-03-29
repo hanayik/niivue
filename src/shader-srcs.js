@@ -329,8 +329,10 @@ void main(void) {
  float r = max(0.00001, abs(cal_max - cal_min));
  float mn = min(cal_min, cal_max);
  f = mix(0.0, 1.0, (f - mn) / r);
- float y = 1.0 / numLayers;
- y = ((layer + 0.5) * y);
+ //float y = 1.0 / numLayers;
+ //y = ((layer + 0.5) * y);
+ //https://stackoverflow.com/questions/5879403/opengl-texture-coordinates-in-pixel-space
+ float y = (2.0 * layer + 1.0)/(2.0 * numLayers);
  FragColor = texture(colormap, vec2(f, y)).rgba;
  FragColor.a *= opacity;
  if (layer < 2.0) return;
