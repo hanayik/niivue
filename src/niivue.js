@@ -358,7 +358,7 @@ Niivue.prototype.loadVolumes  = function(volumeList) {
       this.volumes[i].opacity = 1;
       this.nii2RAS(this.volumes[i])
       //_overlayItem = overlayItem
-      this.selectColormap(this.volumes[0].colorMap) //only base image for now
+      //this.selectColormap(this.volumes[0].colorMap) //only base image for now
       this.updateGLVolume()
     }.bind(this) // bind "this" niivue instance context
     xhr[i].send();
@@ -514,16 +514,18 @@ Niivue.prototype.init = async function () {
 
 Niivue.prototype.updateGLVolume = function() { //load volume or change contrast
   let visibleLayers = 0;
+  let numLayers = this.volumes.length
   // loop through loading volumes in this.volume
-  for (let i=0; i<this.volumes.length; i++){
+  this.refreshColormaps()
+  for (let i=0; i < numLayers; i++){
     // avoid trying to refresh a volume that isn't ready
     if(!this.volumes[i].toRAS) {
       continue;
     }
-    this.refreshLayers(this.volumes[i], visibleLayers);
+    this.refreshLayers(this.volumes[i], visibleLayers, numLayers);
     visibleLayers++;
   }
-	this.drawScene();
+  this.drawScene();
 } // updateVolume()
 
 function intensityRaw2Scaled(hdr, raw) {
@@ -642,7 +644,7 @@ Niivue.prototype.calMinMax = function(overlayItem, img, percentileFrac=0.02, ign
 	overlayItem.global_max = minMax[3]
 } // calMinMax()
 
-Niivue.prototype.refreshLayers = function(overlayItem, layer) {
+Niivue.prototype.refreshLayers = function(overlayItem, layer, numLayers) {
 	let hdr = overlayItem.volume.hdr
 	let img = overlayItem.volume.img
 	let opacity = overlayItem.opacity
@@ -682,10 +684,6 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 		} else
 			outTexture = this.backTexture;
 	}
-
-	
-
-	//fb
 	let fb = this.gl.createFramebuffer();
 	this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, fb);
 	this.gl.disable(this.gl.CULL_FACE);
@@ -734,7 +732,6 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 
 	//blend texture
 	let blendTexture = null;
-
 	if (layer > 1) { //use pass-through shader to copy previous color to temporary 2D texture
 		blendTexture = this.rgbaTex(blendTexture, this.gl.TEXTURE5, this.back.dims);
 		this.gl.bindTexture(this.gl.TEXTURE_3D, blendTexture);
@@ -751,7 +748,11 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	} else
 		blendTexture = this.rgbaTex(blendTexture, this.gl.TEXTURE5, [2,2,2,2]);		
 	orientShader.use(this.gl);
-	this.selectColormap(overlayItem.colorMap)
+	//this.selectColormap(overlayItem.colorMap)
+	//this.refreshColormaps()
+	this.gl.activeTexture(this.gl.TEXTURE1);
+	this.gl.bindTexture(this.gl.TEXTURE_2D, this.colormapTexture);
+	
 	this.gl.uniform1f(orientShader.uniforms["cal_min"], overlayItem.cal_min);
 	this.gl.uniform1f(orientShader.uniforms["cal_max"], overlayItem.cal_max);
 	this.gl.bindTexture(this.gl.TEXTURE_3D, tempTex3D);
@@ -759,6 +760,7 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	this.gl.uniform1i(orientShader.uniforms["blend3D"], 5);
 	this.gl.uniform1i(orientShader.uniforms["colormap"], 1);
 	this.gl.uniform1f(orientShader.uniforms["layer"], layer);
+	this.gl.uniform1f(orientShader.uniforms["numLayers"], numLayers);
 	this.gl.uniform1f(orientShader.uniforms["scl_inter"], hdr.scl_inter);
 	this.gl.uniform1f(orientShader.uniforms["scl_slope"],hdr.scl_slope);
 	this.gl.uniform1f(orientShader.uniforms["opacity"], opacity);
@@ -774,10 +776,10 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer) {
 	this.gl.deleteTexture(blendTexture);
 	this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
 	this.gl.deleteFramebuffer(fb);
-
 } // refreshLayers()
 
-Niivue.prototype.selectColormap = function(lutName = "") {
+Niivue.prototype.colormap = function(lutName = "") {
+//function colormap(lutName = "") {
 	var lut = this.makeLut([0, 255], [0, 255], [0, 255], [0, 128], [0, 255]); //gray
 	if (lutName === "Winter")
 		lut = this.makeLut([0, 0, 0], [0, 128, 255], [255, 196, 128], [0, 64, 128], [0, 128, 255]); //winter
@@ -789,19 +791,39 @@ Niivue.prototype.selectColormap = function(lutName = "") {
 		lut = this.makeLut([68, 49, 53, 253], [1, 104, 183, 231], [84, 142, 121, 37], [0, 56, 80, 88], [0, 65, 192, 255]);//viridis
 	if (lutName === "Inferno")
 		lut = this.makeLut([0, 120, 237, 240], [0, 28, 105, 249], [4, 109, 37, 33], [0, 56, 80, 88], [0, 64, 192, 255]);//inferno
+	return lut;
+} // colormap()
+
+Niivue.prototype.refreshColormaps = function() {
+	let nLayer = this.volumes.length
+	if (nLayer < 1) return;
 	if (this.colormapTexture !== null)
 		this.gl.deleteTexture(this.colormapTexture);
 	this.colormapTexture = this.gl.createTexture();
 	this.gl.activeTexture(this.gl.TEXTURE1);
 	this.gl.bindTexture(this.gl.TEXTURE_2D, this.colormapTexture);
-	this.gl.texStorage2D(this.gl.TEXTURE_2D, 1, this.gl.RGBA8, 256, 1);
-	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+	this.gl.texStorage2D(this.gl.TEXTURE_2D, 1, this.gl.RGBA8, 256, nLayer);
+	//this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+	//this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
+	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
 	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_R, this.gl.CLAMP_TO_EDGE);
 	this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
 	this.gl.pixelStorei( this.gl.UNPACK_ALIGNMENT, 1 )
-	this.gl.texSubImage2D(this.gl.TEXTURE_2D, 0, 0, 0, 256, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, lut);
+	let luts = this.colormap(this.volumes[0].colorMap);
+	if (nLayer > 1) {
+		for (let i=1; i<nLayer; i++){
+			let lut = this.colormap(this.volumes[i].colorMap);
+			let c = new Uint8ClampedArray(luts.length + lut.length);
+			c.set(luts);
+			c.set(lut, luts.length);
+			luts = c;
+			//console.log(i, '>>>',this.volumes[i].colorMap)
+		}	//colorMap	
+	}
+	this.gl.texSubImage2D(this.gl.TEXTURE_2D, 0, 0, 0, 256, nLayer, this.gl.RGBA, this.gl.UNSIGNED_BYTE, luts);
   return this
-} // selectColormap()
+} // refreshColormaps()
 
 Niivue.prototype.makeLut = function(Rs, Gs, Bs, As, Is) {
 	//create color lookup table provided arrays of reds, greens, blues, alphas and intensity indices
@@ -917,9 +939,15 @@ Niivue.prototype.drawColorbar = function(leftTopWidthHeight) {
 		this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 5, 4);
 	}
 	this.colorbarShader.use(this.gl);
+	this.gl.activeTexture(this.gl.TEXTURE1);
+	this.gl.bindTexture(this.gl.TEXTURE_2D, this.colormapTexture);
+	//this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
+	//this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
 	this.gl.uniform2fv(this.colorbarShader.uniforms["canvasWidthHeight"], [this.gl.canvas.width, this.gl.canvas.height]);
 	this.gl.uniform4f(this.colorbarShader.uniforms["leftTopWidthHeight"], leftTopWidthHeight[0], leftTopWidthHeight[1], leftTopWidthHeight[2], leftTopWidthHeight[3]);
 	this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 5, 4);
+	//this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+	//this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
 	//gl.enable(gl.DEPTH_TEST);
 } // drawColorbar()
 

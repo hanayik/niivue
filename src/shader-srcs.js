@@ -202,7 +202,7 @@ export var vertColorbarShader =
 layout(location=0) in vec3 pos;
 uniform vec2 canvasWidthHeight;
 uniform vec4 leftTopWidthHeight;
-out float vColor;
+out vec2 vColor;
 void main(void) {
 	//convert pixel x,y space 1..canvasWidth,1..canvasHeight to WebGL 1..-1,-1..1
 	vec2 frac;
@@ -210,7 +210,7 @@ void main(void) {
 	frac.y = 1.0 - ((leftTopWidthHeight.y + ((1.0 - pos.y) * leftTopWidthHeight.w)) / canvasWidthHeight.y); //1..0
 	frac = (frac * 2.0) - 1.0;
 	gl_Position = vec4(frac, 0.0, 1.0);
-	vColor = pos.x;
+	vColor = pos.xy;
 }`;
 
 export var fragColorbarShader =
@@ -219,10 +219,10 @@ export var fragColorbarShader =
 precision highp int;
 precision highp float;
 uniform highp sampler2D colormap;
-in float vColor;
+in vec2 vColor;
 out vec4 color;
 void main() {
-	color = vec4(texture(colormap, vec2(vColor, 0.5)).rgb, 1.0);
+	color = vec4(texture(colormap, vColor).rgb, 1.0);
 }`;
 
 export var vertLineShader =
@@ -314,6 +314,7 @@ in vec2 TexCoord;
 out vec4 FragColor;
 uniform float coordZ;
 uniform float layer;
+uniform float numLayers;
 uniform float scl_slope;
 uniform float scl_inter;
 uniform float cal_max;
@@ -328,18 +329,15 @@ void main(void) {
  float r = max(0.00001, abs(cal_max - cal_min));
  float mn = min(cal_min, cal_max);
  f = mix(0.0, 1.0, (f - mn) / r);
- FragColor = texture(colormap, vec2(f, 0.5)).rgba;
+ float y = 1.0 / numLayers;
+ y = ((layer + 0.5) * y);
+ FragColor = texture(colormap, vec2(f, y)).rgba;
  FragColor.a *= opacity;
  if (layer < 2.0) return;
  vec2 texXY = TexCoord.xy*0.5 +vec2(0.5,0.5);
  vec4 blendColor = texture(blend3D, vec3(texXY, coordZ));
- //prevColor.a = 0.6;
- //prevColor.b = TexCoord.x;
- //if (TexCoord.x < 0.25) prevColor.b = 1.0; 
- //if (TexCoord.x > 0.75) prevColor.b = 1.0; 
- //if (TexCoord.y < 0.25) prevColor.b = 0.8; 
- //if (TexCoord.y > 0.75) prevColor.b = 0.8; 
- FragColor.rgb = mix(FragColor.rgb, blendColor.rgb, blendColor.a);
+ float prevAlpha = max(FragColor.a, 0.00001);
+ FragColor.rgb = mix(FragColor.rgb, blendColor.rgb, blendColor.a/ (blendColor.a+prevAlpha) );
  FragColor.a += (1.0 - FragColor.a) * blendColor.a;
 }`; 
 

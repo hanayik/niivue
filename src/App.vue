@@ -173,7 +173,7 @@ export default {
           intensityMin: 0, // not used yet
           intensityMax: 100, // not used yet
           intensityRange:[0, 100], // not used yet
-          colorMap: "Winter",
+          colorMap: "Warm",
           opacity: 100,
           visible: true,
         },
