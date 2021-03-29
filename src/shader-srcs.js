@@ -335,10 +335,12 @@ void main(void) {
  FragColor.a *= opacity;
  if (layer < 2.0) return;
  vec2 texXY = TexCoord.xy*0.5 +vec2(0.5,0.5);
- vec4 blendColor = texture(blend3D, vec3(texXY, coordZ));
- float prevAlpha = max(FragColor.a, 0.00001);
- FragColor.rgb = mix(FragColor.rgb, blendColor.rgb, blendColor.a/ (blendColor.a+prevAlpha) );
- FragColor.a += (1.0 - FragColor.a) * blendColor.a;
+ vec4 prevColor = texture(blend3D, vec3(texXY, coordZ));
+ // https://en.wikipedia.org/wiki/Alpha_compositing
+ float aout = FragColor.a + (1.0 - FragColor.a) * prevColor.a;
+ if (aout <= 0.0) return;
+ FragColor.rgb = ((FragColor.rgb * FragColor.a) + (prevColor.rgb * prevColor.a * (1.0 - FragColor.a))) / aout;
+ FragColor.a = aout;
 }`; 
 
 export var vertPassThroughShader =
