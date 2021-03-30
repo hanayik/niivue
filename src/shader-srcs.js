@@ -181,8 +181,10 @@ out vec4 color;
 void main() {
 	color = vec4(texture(volume, texPos).rgb, opacity);
 	vec4 ocolor = texture(overlay, texPos);
-	color.rgb = mix(color.rgb, ocolor.rgb, ocolor.a);
-	color.a = color.a + (ocolor.a * (1.0 - color.a));
+    float aout = ocolor.a + (1.0 - ocolor.a) * color.a;
+    if (aout <= 0.0) return;
+    color.rgb = ((ocolor.rgb * ocolor.a) + (color.rgb * color.a * (1.0 - ocolor.a))) / aout;
+    color.a = aout;
 }`;
 
 export var fragLineShader =
@@ -202,7 +204,7 @@ export var vertColorbarShader =
 layout(location=0) in vec3 pos;
 uniform vec2 canvasWidthHeight;
 uniform vec4 leftTopWidthHeight;
-out float vColor;
+out vec2 vColor;
 void main(void) {
 	//convert pixel x,y space 1..canvasWidth,1..canvasHeight to WebGL 1..-1,-1..1
 	vec2 frac;
@@ -210,7 +212,7 @@ void main(void) {
 	frac.y = 1.0 - ((leftTopWidthHeight.y + ((1.0 - pos.y) * leftTopWidthHeight.w)) / canvasWidthHeight.y); //1..0
 	frac = (frac * 2.0) - 1.0;
 	gl_Position = vec4(frac, 0.0, 1.0);
-	vColor = pos.x;
+	vColor = pos.xy;
 }`;
 
 export var fragColorbarShader =
@@ -219,10 +221,10 @@ export var fragColorbarShader =
 precision highp int;
 precision highp float;
 uniform highp sampler2D colormap;
-in float vColor;
+in vec2 vColor;
 out vec4 color;
 void main() {
-	color = vec4(texture(colormap, vec2(vColor, 0.5)).rgb, 1.0);
+	color = vec4(texture(colormap, vColor).rgb, 1.0);
 }`;
 
 export var vertLineShader =
@@ -288,7 +290,7 @@ in vec3 vPos;
 out vec2 TexCoord;
 void main() {
     TexCoord = vPos.xy;
-    gl_Position = vec4( (vPos.xy-vec2(0.5,0.5))* 2.0, 0.0, 1.0);
+    gl_Position = vec4( (vPos.xy-vec2(0.5,0.5)) * 2.0, 0.0, 1.0);
 }`;
 
 export var fragOrientShaderU =
@@ -314,12 +316,13 @@ in vec2 TexCoord;
 out vec4 FragColor;
 uniform float coordZ;
 uniform float layer;
+uniform float numLayers;
 uniform float scl_slope;
 uniform float scl_inter;
 uniform float cal_max;
 uniform float cal_min;
 uniform highp sampler2D colormap;
-uniform highp sampler2D in2D;
+uniform lowp sampler3D blend3D;
 uniform float opacity;
 uniform mat4 mtx;
 void main(void) {
@@ -328,13 +331,33 @@ void main(void) {
  float r = max(0.00001, abs(cal_max - cal_min));
  float mn = min(cal_min, cal_max);
  f = mix(0.0, 1.0, (f - mn) / r);
- FragColor = texture(colormap, vec2(f, 0.5)).rgba;
+ //float y = 1.0 / numLayers;
+ //y = ((layer + 0.5) * y);
+ //https://stackoverflow.com/questions/5879403/opengl-texture-coordinates-in-pixel-space
+ float y = (2.0 * layer + 1.0)/(2.0 * numLayers);
+ FragColor = texture(colormap, vec2(f, y)).rgba;
  FragColor.a *= opacity;
  if (layer < 2.0) return;
- vec4 prevColor = texture(in2D, TexCoord);
- FragColor.rgb = mix(FragColor.rgb, prevColor.rgb, FragColor.a);
- FragColor.a += ((1.0 - FragColor.a) * prevColor.a);
+ vec2 texXY = TexCoord.xy*0.5 +vec2(0.5,0.5);
+ vec4 prevColor = texture(blend3D, vec3(texXY, coordZ));
+ // https://en.wikipedia.org/wiki/Alpha_compositing
+ float aout = FragColor.a + (1.0 - FragColor.a) * prevColor.a;
+ if (aout <= 0.0) return;
+ FragColor.rgb = ((FragColor.rgb * FragColor.a) + (prevColor.rgb * prevColor.a * (1.0 - FragColor.a))) / aout;
+ FragColor.a = aout;
 }`; 
+
+export var vertPassThroughShader =
+`#version 300 es
+#line 283
+precision highp int;
+precision highp float;
+in vec3 vPos;
+out vec2 TexCoord;
+void main() {
+    TexCoord = vPos.xy;
+    gl_Position = vec4(vPos.x, vPos.y, 0.0, 1.0);
+}`;
 
 export var fragPassThroughShader =
 `#version 300 es
@@ -343,9 +366,8 @@ precision highp float;
 in vec2 TexCoord;
 out vec4 FragColor;
 uniform float coordZ;
-uniform highp sampler3D in3D;
+uniform lowp sampler3D in3D;
 void main(void) {
- //FragColor = texture(in3D, vec3(TexCoord.xy, coordZ));
- FragColor = vec4(TexCoord.x, TexCoord.y, 1.0, 0.9);
+ FragColor = texture(in3D, vec3(TexCoord.xy, coordZ));
 }`; 
 
