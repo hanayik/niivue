@@ -1,6 +1,43 @@
 <template>
 
   <div class='mt-5' id="controls" >
+    <v-dialog
+      v-model="dialog"
+      width="500"
+    >   
+      <v-card>
+        <v-card-title class="headline grey lighten-2">
+          Load Overlay
+        </v-card-title>
+
+        <v-card-text>
+          Select an overlay to add to the display
+        </v-card-text>
+        <v-text-field
+          v-model="overlayUrl"
+          label="Overlay URL"
+          hide-details="auto"
+        ></v-text-field>
+        <v-divider></v-divider>
+
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn
+            color="red lighten-2"
+            dark
+            @click="dialog = false"
+          >
+          Cancel
+          </v-btn>
+          <v-btn
+            color="primary"
+            @click="dialog = false; loadOverlay()"
+          >
+            OK
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <v-row class="my-2 mx-2 align-center">
       <h3>Layers</h3>
       <v-spacer></v-spacer>
@@ -116,7 +153,8 @@ export default {
       draggable: true,
       opacity: 1.0,
       overlayVisibilityState: {},
-      
+      dialog: false,
+      overlayUrl: '',      
     }
   },
 
@@ -154,7 +192,28 @@ export default {
     },
 
     onAddOverlay: function () {
-      alert('adding overlays in this demo is not implemented yet! :)')
+      this.dialog = true;
+    },
+
+    loadOverlay: function() {
+      if(this.overlayUrl) {
+        let newVol =
+        { 
+              url: this.overlayUrl,
+              volume:{hdr:null, img:null},
+              name: this.overlayUrl.split('/').pop(),
+              intensityMin:0,
+              intensityMax:100,
+              intensityRange: [0,100],
+              colorMap: "gray",
+              opacity: 100,
+              visible: true,
+        };
+
+        this.$set(this.overlays_, this.overlays_.length, newVol);
+        this.overlayUrl = '';
+        bus.$emit('refresh');
+      }
     },
 
   }
