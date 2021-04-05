@@ -1,13 +1,17 @@
 import * as nii from "nifti-reader-js"
 import { Shader } from "./shader.js";
 import * as mat from "gl-matrix";
+//const {ccallArrays, cwrapArrays} = require("./wasm-arrays.js")
+//import { ccallArraysX, ccallArrays, cwrapArrays} from "wasm-arrays"
+//import { ccallArraysX, ccallArrays, cwrapArrays} from "/Users/chrisrorden/src/wasm-arrays/dist/wasm-arrays.min.js"
+//import * as ccall from "wasm-arrays"
 import { vertSliceShader, fragSliceShader } from "./shader-srcs.js";
 import { vertLineShader, fragLineShader } from "./shader-srcs.js";
 import { vertRenderShader, fragRenderShader } from "./shader-srcs.js";
 import { vertColorbarShader, fragColorbarShader } from "./shader-srcs.js";
 import { vertFontShader, fragFontShader } from "./shader-srcs.js";
 import { vertOrientShader, vertPassThroughShader, fragPassThroughShader, fragOrientShaderU, fragOrientShaderI, fragOrientShaderF, fragOrientShader} from "./shader-srcs.js";
-
+//import { readFileSync } from 'fs';
 /**
  * @class Niivue
  * @description
@@ -447,6 +451,18 @@ Niivue.prototype.initText = async function () {
 	}
 } // initText()
 
+//var wasmB64 ="AGFzbQEAAAABhoCAgAABYAF/AX8DgoCAgAABAASEgICAAAFwAAAFg4CAgAABAAEGgYCAgAAAB5iAgIAAAgZtZW1vcnkCAAtfWjdzcXVhcmVyaQAACo2AgIAAAYeAgIAAACAAIABsCw==";
+
+
+var wasmB64 =
+`AGFzbQEAAAABjICAgAACYAF/AX9gAn9/AX8Dg4CAgAACAAEEhICAgAABcAAABYOA
+gIAAAQABBoGAgIAAAAeugICAAAMGbWVtb3J5AgALX1o3c3F1YXJlcmkAABNfWjEy
+ZG91YmxlVmFsdWVzUGFpAAEK44CAgAACh4CAgAAAIAAgAGwL0YCAgAABAn9BACgC
+BCIDGiADIAFBD2pBcHFrIgIaAkAgAUEBSA0AIAIhAwNAIAMgAC0AAEEBdDoAACAD
+QQFqIQMgAEEBaiEAIAFBf2oiAQ0ACwsgAgs=`
+
+
+
 Niivue.prototype.init = async function () {
 	//initial setup: only at the startup of the component
   // print debug info (gpu vendor and renderer)
@@ -509,6 +525,56 @@ Niivue.prototype.init = async function () {
   this.orientShaderI = new Shader(this.gl, vertOrientShader, fragOrientShaderI.concat(fragOrientShader));
   this.orientShaderF = new Shader(this.gl, vertOrientShader, fragOrientShaderF.concat(fragOrientShader));
   await this.initText();
+  //wasm
+  //https://developers.google.com/web/updates/2018/04/loading-wasm
+  //openssl base64 -in dat.wasm -out dat.b64
+  //https://www.freecodecamp.org/news/get-started-with-webassembly-using-only-14-lines-of-javascript-b37b6aaca1e4/
+  
+  //var importObject = { imports: { imported_func: arg => console.log('...', arg) } };
+  //var url42 = 'data:application/wasm;base64,' + "AGFzbQEAAAABCAJgAX8AYAAAAhkBB2ltcG9ydHMNaW1wb3J0ZWRfZnVuYwAAAwIBAQcRAQ1leHBvcnRlZF9mdW5jAAEKCAEGAEEqEAAL";
+  //WebAssembly.instantiateStreaming(fetch(url42), importObject).then(obj => obj.instance.exports.exported_func());
+  
+  
+ 
+  //https://www.freecodecamp.org/news/get-started-with-webassembly-using-only-14-lines-of-javascript-b37b6aaca1e4/
+  //var url57 = 'data:application/wasm;base64,' + "AGFzbQEAAAABhoCAgAABYAF/AX8DgoCAgAABAASEgICAAAFwAAAFg4CAgAABAAEGgYCAgAAAB5iAgIAAAgZtZW1vcnkCAAtfWjdzcXVhcmVyaQAACo2AgIAAAYeAgIAAACAAIABsCw==";
+  var url57 = 'data:application/wasm;base64,' + wasmB64;
+  let squarer;
+  let doubler;
+  function loadWebAssembly(fileName) {
+    return fetch(fileName)
+      .then(response => response.arrayBuffer())
+      .then(buffer => WebAssembly.compile(buffer))
+      .then(module => {return new WebAssembly.Instance(module) });
+  }
+  await loadWebAssembly(url57)
+    .then(instance => {
+      squarer = instance.exports._Z7squareri;
+      doubler = instance.exports._Z12doubleValuesPai
+      console.log('Finished compiling! Ready when you are...');
+    }); 
+	
+
+  console.log("..",squarer(2)) 
+  console.log("..",squarer(3)) 
+  console.log("..",squarer(9))
+  console.log(doubler);
+
+  //const result = ccallArrays("addNums", "number", ["array"], [[1,2,3,4,5,6,7]])
+  //const res = ccallArrays("_Z12doubleValuesPai", "array", ["array"], [[1,2,3,4,5]], {heapIn: "HEAP8", heapOut: "HEAP8", returnArraySize: 5})
+  //const res = ccallArrays("doubleValues", "array", ["array"], [[1,2,3,4,5]], {heapIn: "HEAP8", heapOut: "HEAP8", returnArraySize: 5})
+//console.log(res) // [2,4,6,8,10]
+  
+  //const res = wasm.ccallArrays("doubleValues", "array", ["array"], [[1,2,3,4,5]], {heapIn: "HEAP8", heapOut: "HEAP8", returnArraySize: 5})
+  //console.log(res) // [2,4,6,8,10]
+  //TODO: https://becominghuman.ai/passing-and-returning-webassembly-array-parameters-a0f572c65d97
+  /*
+  var float32 = new Float32Array(2);
+  float32[0] = 42;
+  float32[1] = 1;
+  
+  console.log(">>", sumup(float32, float32.length));*/
+  
   return this
 } // init()
 
@@ -531,6 +597,12 @@ Niivue.prototype.updateGLVolume = function() { //load volume or change contrast
 function intensityRaw2Scaled(hdr, raw) {
   if (hdr.scl_slope === 0) hdr.scl_slope = 1.0;
   return (raw * hdr.scl_slope) + hdr.scl_inter
+}
+
+function timeElapsed( startTime) {
+  let endTime = new Date();
+  var msElapsed = endTime - startTime; //in ms
+  console.log(msElapsed + " ms");
 }
 
 // given an overlayItem and its img TypedArray, calculate 2% and 98% display range if needed
@@ -636,8 +708,10 @@ Niivue.prototype.calMinMaxCore = function(overlayItem, img, percentileFrac=0.02,
 } //sliceScale
 
 Niivue.prototype.calMinMax = function(overlayItem, img, percentileFrac=0.02, ignoreZeroVoxels = false){
+	let startTime = new Date();
 	let minMax = this.calMinMaxCore(overlayItem, img, percentileFrac, ignoreZeroVoxels)
 	console.log("cal_min, cal_max, global_min, global_max", minMax[0], minMax[1], minMax[2], minMax[3])
+	timeElapsed(startTime)
 	overlayItem.cal_min = minMax[0]
 	overlayItem.cal_max = minMax[1]
 	overlayItem.global_min = minMax[2]
@@ -1087,7 +1161,7 @@ Niivue.prototype.draw3D = function() {
 	var rayDir = mat.vec3.fromValues(rayDir4[0],rayDir4[1],rayDir4[2]);
 	mat.vec3.normalize(rayDir, rayDir);
 	//defuzz, avoid divide by zero
-	const tiny = 0.00001;
+	const tiny = 0.001;
 	if (Math.abs(rayDir[0]) < tiny) rayDir[0] = tiny;
 	if (Math.abs(rayDir[1]) < tiny) rayDir[1] = tiny;
 	if (Math.abs(rayDir[2]) < tiny) rayDir[2] = tiny;
