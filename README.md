@@ -1,6 +1,8 @@
 # NiiVue
 
-**WARNING: THIS IS A WORK IN PROGRESS**
+## *** THIS REPO HAS BEEN MOVED ***
+
+new location: https://github.com/niivue/niivue
 
 - [Overview]()
 - [Development Environment]()
