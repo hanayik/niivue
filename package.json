@@ -41,6 +41,7 @@
   },
   "eslintConfig": {
     "root": true,
+    "ignorePatterns": ["robust-range.js"],
     "env": {
       "node": true
     },
