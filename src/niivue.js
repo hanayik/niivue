@@ -11,10 +11,13 @@ import { vertOrientShader, vertPassThroughShader, fragPassThroughShader, fragOri
 import createModule from './robust-range';
 
 var Module;
-var wasmLoaded = false;
-const wasmPromise = createModule(); 
-	
-
+// var wasmLoaded = false;
+//const wasmPromise = createModule(); 
+// require('./robust-range.js');
+// import * as robust from './robust-range.js';
+// import Module from './robust-range';
+// var wasm = robust.Module;
+// console.log(wasm);
 /**
  * @class Niivue
  * @description
@@ -327,7 +330,7 @@ let hdr = overlayItem.volume.hdr;
 } // nii2RAS()
 
 // currently: volumeList is an array if objects, each object is a volume that can be loaded
-Niivue.prototype.loadVolumes  = function(volumeList) {
+Niivue.prototype.loadVolumes  = async function(volumeList) {
   this.volumes = volumeList
   this.back = this.volumes[0] // load first volume as back layer
   this.overlays = this.volumes.slice(1) // remove first element (that is now this.back, all other imgaes are overlays)
@@ -345,7 +348,7 @@ Niivue.prototype.loadVolumes  = function(volumeList) {
       console.error("error loading volume ", this.volumes[i].url)
       alert("error loading " + this.volumes[i].url)
     }
-    xhr[i].onload = function () {
+    xhr[i].onload = async function () {
       let dataBuffer = xhr[i].response;
       hdr = null
       img = null
@@ -364,9 +367,11 @@ Niivue.prototype.loadVolumes  = function(volumeList) {
       this.volumes[i].volume.hdr = hdr
       this.volumes[i].volume.img = img
       this.volumes[i].opacity = 1;
-      this.nii2RAS(this.volumes[i])
+      this.nii2RAS(this.volumes[i]);
       //_overlayItem = overlayItem
       //this.selectColormap(this.volumes[0].colorMap) //only base image for now
+		Module = await createModule();
+		Niivue.prototype.robust_range = Module.cwrap('robust_range', 'number', ['number', 'number']);
       this.updateGLVolume()
     }.bind(this) // bind "this" niivue instance context
     xhr[i].send();
@@ -517,7 +522,6 @@ Niivue.prototype.init = async function () {
   this.orientShaderI = new Shader(this.gl, vertOrientShader, fragOrientShaderI.concat(fragOrientShader));
   this.orientShaderF = new Shader(this.gl, vertOrientShader, fragOrientShaderF.concat(fragOrientShader));
   await this.initText();
-  
   return this
 } // init()
 
@@ -584,6 +588,105 @@ Niivue.prototype.calMinMaxCore = function(overlayItem, img, percentileFrac=0.02,
 
     return float_buffer;
 } // calMinMaxCore
+
+Niivue.prototype.calMinMaxCoreOld = function(overlayItem, img, percentileFrac=0.02, ignoreZeroVoxels = false){
+	let imgRaw
+	let hdr = overlayItem.volume.hdr
+	if (hdr.datatypeCode === 2)
+		imgRaw = new Uint8Array(img)
+	else if (hdr.datatypeCode === 4)
+		imgRaw = new Int16Array(img)
+	else if (hdr.datatypeCode === 16)
+		imgRaw = new Float32Array(img)
+	else if (hdr.datatypeCode === 64)
+		imgRaw = new Float64Array(img)
+	else if (hdr.datatypeCode === 512)
+		imgRaw = new Uint16Array(img)
+	//determine full range: min..max
+	let mn=img[0]
+	let mx=img[0]
+	let nZero = 0
+	let nNan = 0
+	let nVox = imgRaw.length
+	for (let i=0; i < nVox; i++){
+		if (isNaN(imgRaw[i])) {
+			nNan++
+			continue
+		}
+		if (imgRaw[i] === 0) {
+			nZero++
+			continue
+		}
+		mn = Math.min(imgRaw[i],mn)
+		mx = Math.max(imgRaw[i],mx)
+	}
+	var mnScale = intensityRaw2Scaled(hdr, mn)
+	var mxScale = intensityRaw2Scaled(hdr, mx)
+	if (!ignoreZeroVoxels)
+		nZero = 0
+	nZero += nNan
+	let n2pct = Math.round((nVox - nZero) * percentileFrac)
+	if ((n2pct < 1) || (mn === mx)) {
+		console.log("no variability in image intensity?")
+		return [ mnScale, mxScale, mnScale, mxScale ]
+	}
+	let nBins = 1001
+	let scl = (nBins-1)/(mx-mn)
+	let hist = new Array(nBins)
+	for (let i = 0; i < nBins; i++)
+		hist[i] = 0
+	if (ignoreZeroVoxels) {
+		for (let i = 0; i <= nVox; i++) {
+			if (imgRaw[i] === 0)
+				continue
+			if (isNaN(imgRaw[i]))
+				continue
+			hist[ (imgRaw[i]-mn) * scl] ++
+		}
+	} else {
+		for (let i = 0; i <= nVox; i++) {
+		if (isNaN(imgRaw[i]))
+			continue
+		hist[ (imgRaw[i]-mn) * scl] ++
+		}
+	}
+	let n = 0
+	let lo = 0
+	while (n < n2pct) {
+		n += hist[lo]
+		lo++
+	}
+	lo -- //remove final increment
+	n = 0
+	let hi = nBins
+	while (n < n2pct) {
+		hi--
+		n += hist[hi]
+	}
+	if (lo == hi) { //MAJORITY are not black or white
+		let ok = -1
+		while (ok !== 0) {
+			if (lo > 0) {
+				lo--
+				if (hist[lo] > 0) ok = 0
+			}
+			if ((ok != 0) && (hi < (nBins-1))) {
+			hi++
+			if (hist[hi] > 0) ok = 0
+			}
+			if ((lo == 0) && (hi == (nBins-1))) ok = 0
+		} //while not ok
+	} //if lo == hi
+	var pct2 = intensityRaw2Scaled(hdr, (lo)/scl + mn)
+	var pct98 = intensityRaw2Scaled(hdr, (hi)/scl + mn)
+	console.log("full range %f..%f  (voxels 0 or NaN = %i) robust range %f..%f", mnScale, mxScale, nZero, pct2, pct98)
+	if ((overlayItem.volume.hdr.cal_min < overlayItem.volume.hdr.cal_max) && (overlayItem.volume.hdr.cal_min >= mnScale) && (overlayItem.volume.hdr.cal_max <= mxScale)){
+		console.log("ignoring robust range: using header cal_min and cal_max")
+		pct2 = overlayItem.volume.hdr.cal_min;
+		pct98 = overlayItem.volume.hdr.cal_max;
+	}
+	return [ pct2, pct98, mnScale, mxScale ]
+  } //calMinMaxCore
 
 Niivue.prototype.calMinMax = function(overlayItem, img, percentileFrac=0.02, ignoreZeroVoxels = false){
 	let minMax = this.calMinMaxCore(overlayItem, img, percentileFrac, ignoreZeroVoxels)
@@ -678,18 +781,18 @@ Niivue.prototype.refreshLayers = function(overlayItem, layer, numLayers) {
 		this.gl.texSubImage3D(this.gl.TEXTURE_3D, 0, 0, 0, 0, hdr.dims[1], hdr.dims[2], hdr.dims[3], this.gl.RED_INTEGER, this.gl.UNSIGNED_SHORT, imgRaw);
 	}
 	if (overlayItem.global_min === undefined) {//only once, first time volume is loaded
-		if(!wasmLoaded) {
-			wasmPromise.then((WasmModule) => {
-				wasmLoaded = true;
-				Module = WasmModule;
-				Niivue.prototype.robust_range = Module.cwrap('robust_range', 'number', ['number', 'number']);
+		// if(!wasmLoaded) {
+		// 	wasmPromise.then((WasmModule) => {
+		// 		wasmLoaded = true;
+		// 		Module = WasmModule;
+		// 		Niivue.prototype.robust_range = Module.cwrap('robust_range', 'number', ['number', 'number']);
 			
-				this.calMinMax(overlayItem, imgRaw);
-			});
-		}
-		else {
+		// 		this.calMinMax(overlayItem, imgRaw);
+		// 	});
+		// }
+		// else {
 			this.calMinMax(overlayItem, imgRaw);
-		}
+		// }
 	}
 
 	//blend texture
