@@ -29,8 +29,10 @@ int nifti_robust_range(float* img, int nvox, float* pct2, float * pct98, float* 
 			nZero++;
 			if (ignoreZeroVoxels) continue;
 		}
-		mn = fmin(img[i],mn);
-		mx = fmax(img[i],mx);
+		// mn = fmin(img[i],mn);
+		if(img[i] < mn) mn = img[i];
+		// mx = fmax(img[i],mx);
+		if(img[i] > mx) mx = img[i];
 	}
 	*mn0 = mn;
 	*mx1 = mx;

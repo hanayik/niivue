@@ -16,6 +16,7 @@
     "gl-matrix": "^3.3.0",
     "hammerjs": "^2.0.8",
     "nifti-reader-js": "^0.5.4",
+    "perf_hooks": "0.0.1",
     "vue": "^2.6.12",
     "vue-router": "^3.5.1",
     "vuedraggable": "^2.24.3",
@@ -41,7 +42,9 @@
   },
   "eslintConfig": {
     "root": true,
-    "ignorePatterns": ["robust-range.js"],
+    "ignorePatterns": [
+      "robust-range.js"
+    ],
     "env": {
       "node": true
     },

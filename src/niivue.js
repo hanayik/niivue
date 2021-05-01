@@ -330,7 +330,7 @@ let hdr = overlayItem.volume.hdr;
 } // nii2RAS()
 
 // currently: volumeList is an array if objects, each object is a volume that can be loaded
-Niivue.prototype.loadVolumes  = async function(volumeList) {
+Niivue.prototype.loadVolumes = function(volumeList) {
   this.volumes = volumeList
   this.back = this.volumes[0] // load first volume as back layer
   this.overlays = this.volumes.slice(1) // remove first element (that is now this.back, all other imgaes are overlays)
@@ -543,7 +543,7 @@ Niivue.prototype.updateGLVolume = function() { //load volume or change contrast
 
 function intensityRaw2Scaled(hdr, raw) {
   if (hdr.scl_slope === 0) hdr.scl_slope = 1.0;
-  return (raw * hdr.scl_slope) + hdr.scl_inter
+  return (raw * hdr.scl_slope) + hdr.scl_inter;
 }
 
 // given an overlayItem and its img TypedArray, calculate 2% and 98% display range if needed
@@ -551,6 +551,8 @@ function intensityRaw2Scaled(hdr, raw) {
 Niivue.prototype.calMinMaxCore = function(overlayItem, img, percentileFrac=0.02, ignoreZeroVoxels = false){
 	const hdr = overlayItem.volume.hdr;
 	let float_buffer;
+
+	if (hdr.scl_slope === 0) hdr.scl_slope = 1.0;
 
 	switch(hdr.datatypeCode) {
 		case 2:
@@ -562,7 +564,7 @@ Niivue.prototype.calMinMaxCore = function(overlayItem, img, percentileFrac=0.02,
 			//https://github.com/emscripten-core/emscripten/issues/4003
 			Module.HEAPF32.set(img, buf >> 2);
 
-			let result = this.robust_range(buf, img.length / 4);
+			let result = this.robust_range(buf, img.length >> 4);
 			float_buffer = new Float32Array(Module.HEAPF32.buffer, result, 4);			
 			Module._free(buf);
 
@@ -689,7 +691,9 @@ Niivue.prototype.calMinMaxCoreOld = function(overlayItem, img, percentileFrac=0.
   } //calMinMaxCore
 
 Niivue.prototype.calMinMax = function(overlayItem, img, percentileFrac=0.02, ignoreZeroVoxels = false){
-	let minMax = this.calMinMaxCore(overlayItem, img, percentileFrac, ignoreZeroVoxels)
+	console.time('callMinMaxCore');
+	let minMax = this.calMinMaxCore(overlayItem, img, percentileFrac, ignoreZeroVoxels);
+	console.timeEnd('callMinMaxCore');
 	console.log("cal_min, cal_max, global_min, global_max", minMax[0], minMax[1], minMax[2], minMax[3])
 	overlayItem.cal_min = minMax[0]
 	overlayItem.cal_max = minMax[1]
