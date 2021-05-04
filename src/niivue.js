@@ -550,45 +550,57 @@ function intensityRaw2Scaled(hdr, raw) {
 //clone FSL robust_range estimates https://github.com/rordenlab/niimath/blob/331758459140db59290a794350d0ff3ad4c37b67/src/core32.c#L1215
 Niivue.prototype.calMinMaxCore = function(overlayItem, img, percentileFrac=0.02, ignoreZeroVoxels = false){
 	const hdr = overlayItem.volume.hdr;
-	let float_buffer;
+	let result_buffer;
+	let raw_buffer;
+	
 
 	if (hdr.scl_slope === 0) hdr.scl_slope = 1.0;
 
 	switch(hdr.datatypeCode) {
 		case 2:
-		case 4:
-		case 16: {
-			var buf = Module._malloc(img.length*img.BYTES_PER_ELEMENT);
-			console.log('percentileFrac: ' + percentileFrac + ', ignoreZeroVoxels: ' + ignoreZeroVoxels);
-			
-			//https://github.com/emscripten-core/emscripten/issues/4003
-			Module.HEAPF32.set(img, buf >> 2);
-
-			let result = this.robust_range(buf, img.length >> 4);
-			float_buffer = new Float32Array(Module.HEAPF32.buffer, result, 4);			
-			Module._free(buf);
-
-			let mnScale = intensityRaw2Scaled(hdr, float_buffer[2]);
-			let mxScale = intensityRaw2Scaled(hdr, float_buffer[3]);
-
-			if ((overlayItem.volume.hdr.cal_min < overlayItem.volume.hdr.cal_max) && (overlayItem.volume.hdr.cal_min >= mnScale) && (overlayItem.volume.hdr.cal_max <= mxScale)){
-				console.log("ignoring robust range: using header cal_min and cal_max")
-				float_buffer[0] = overlayItem.volume.hdr.cal_min;
-				float_buffer[1] = overlayItem.volume.hdr.cal_max;
-			}
-			float_buffer[2] = mnScale;
-			float_buffer[3] = mxScale;
-
-			console.log('range is ');
-			console.log(float_buffer);
+			raw_buffer = new Uint8Array(img);
 			break;
-		}
-		default: {
+		case 4:
+			raw_buffer = new Int16Array(img);
+			break;
+		case 16: 
+			raw_buffer = new Float32Array(img);
+			break;
+		case 64:
+			raw_buffer = img;
+			break;
+		case 512:
+			raw_buffer = new Uint16Array(img);
+			break;
+		default: 
 			throw 'image format not supported';
-		}
 	}
 
-    return float_buffer;
+	let float64_buffer = Float64Array.from(raw_buffer);
+	var buf = Module._malloc(float64_buffer.length*float64_buffer.BYTES_PER_ELEMENT);
+	console.log('percentileFrac: ' + percentileFrac + ', ignoreZeroVoxels: ' + ignoreZeroVoxels);
+	
+	//https://github.com/emscripten-core/emscripten/issues/4003
+	Module.HEAPF32.set(float64_buffer, buf >> 2);
+
+	let result = this.robust_range(buf, float64_buffer.length);
+	result_buffer = new Float64Array(Module.HEAPF64.buffer, result, 4);			
+	Module._free(buf);
+
+	let mnScale = intensityRaw2Scaled(hdr, result_buffer[2]);
+	let mxScale = intensityRaw2Scaled(hdr, result_buffer[3]);
+
+	if ((overlayItem.volume.hdr.cal_min < overlayItem.volume.hdr.cal_max) && (overlayItem.volume.hdr.cal_min >= mnScale) && (overlayItem.volume.hdr.cal_max <= mxScale)){
+		console.log("ignoring robust range: using header cal_min and cal_max")
+		result_buffer[0] = overlayItem.volume.hdr.cal_min;
+		result_buffer[1] = overlayItem.volume.hdr.cal_max;
+	}
+	result_buffer[2] = mnScale;
+	result_buffer[3] = mxScale;
+
+	console.log('range is ');
+	console.log(result_buffer);
+    return result_buffer;
 } // calMinMaxCore
 
 Niivue.prototype.calMinMaxCoreOld = function(overlayItem, img, percentileFrac=0.02, ignoreZeroVoxels = false){
