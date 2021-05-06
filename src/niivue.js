@@ -551,44 +551,40 @@ function intensityRaw2Scaled(hdr, raw) {
 Niivue.prototype.calMinMaxCore = function(overlayItem, img, percentileFrac=0.02, ignoreZeroVoxels = false){
 	const hdr = overlayItem.volume.hdr;
 	let result_buffer;
-	let raw_buffer;
-	
+	let float32_buffer;
 
 	if (hdr.scl_slope === 0) hdr.scl_slope = 1.0;
 
 	switch(hdr.datatypeCode) {
 		case 2:
-			raw_buffer = new Uint8Array(img);
+			float32_buffer = new Float32Array(new Uint8Array(img)); 
 			break;
 		case 4:
-			raw_buffer = new Int16Array(img);
+			float32_buffer = new Float32Array(new Int16Array(img)); 
 			break;
 		case 16: 
-			raw_buffer = new Float32Array(img);
+			float32_buffer = new Float32Array(img); 
 			break;
 		case 64:
-			raw_buffer = img;
-			break;
+			return this.calMinMaxCoreJS(overlayItem, img, percentileFrac, ignoreZeroVoxels);
 		case 512:
-			raw_buffer = new Uint16Array(img);
-			break;
+			return this.calMinMaxCoreJS(overlayItem, img, percentileFrac, ignoreZeroVoxels);
 		default: 
 			throw 'image format not supported';
 	}
 
-	let float64_buffer = Float64Array.from(raw_buffer);
-	var buf = Module._malloc(float64_buffer.length*float64_buffer.BYTES_PER_ELEMENT);
+	var buf = Module._malloc(float32_buffer.length*float32_buffer.BYTES_PER_ELEMENT);
 	console.log('percentileFrac: ' + percentileFrac + ', ignoreZeroVoxels: ' + ignoreZeroVoxels);
 	
 	//https://github.com/emscripten-core/emscripten/issues/4003
-	Module.HEAPF32.set(float64_buffer, buf >> 2);
+	Module.HEAPF32.set(float32_buffer, buf >> 2);
 
-	let result = this.robust_range(buf, float64_buffer.length);
-	result_buffer = new Float64Array(Module.HEAPF64.buffer, result, 4);			
+	let result = this.robust_range(buf, float32_buffer.length);
+	result_buffer = new Float32Array(Module.HEAPF32.buffer, result, 4);			
 	Module._free(buf);
 
-	let mnScale = intensityRaw2Scaled(hdr, result_buffer[2]);
-	let mxScale = intensityRaw2Scaled(hdr, result_buffer[3]);
+	let mnScale= result_buffer[2] * hdr.scl_slope + hdr.scl_inter;
+	let mxScale = result_buffer[3] * hdr.scl_slope + hdr.scl_inter;
 
 	if ((overlayItem.volume.hdr.cal_min < overlayItem.volume.hdr.cal_max) && (overlayItem.volume.hdr.cal_min >= mnScale) && (overlayItem.volume.hdr.cal_max <= mxScale)){
 		console.log("ignoring robust range: using header cal_min and cal_max")
@@ -603,7 +599,7 @@ Niivue.prototype.calMinMaxCore = function(overlayItem, img, percentileFrac=0.02,
     return result_buffer;
 } // calMinMaxCore
 
-Niivue.prototype.calMinMaxCoreOld = function(overlayItem, img, percentileFrac=0.02, ignoreZeroVoxels = false){
+Niivue.prototype.calMinMaxCoreJS = function(overlayItem, img, percentileFrac=0.02, ignoreZeroVoxels = false){
 	let imgRaw
 	let hdr = overlayItem.volume.hdr
 	if (hdr.datatypeCode === 2)
@@ -627,7 +623,7 @@ Niivue.prototype.calMinMaxCoreOld = function(overlayItem, img, percentileFrac=0.
 			nNan++
 			continue
 		}
-		if (imgRaw[i] === 0) {
+		if (ignoreZeroVoxels && imgRaw[i] === 0) {
 			nZero++
 			continue
 		}
@@ -636,8 +632,7 @@ Niivue.prototype.calMinMaxCoreOld = function(overlayItem, img, percentileFrac=0.
 	}
 	var mnScale = intensityRaw2Scaled(hdr, mn)
 	var mxScale = intensityRaw2Scaled(hdr, mx)
-	if (!ignoreZeroVoxels)
-		nZero = 0
+	
 	nZero += nNan
 	let n2pct = Math.round((nVox - nZero) * percentileFrac)
 	if ((n2pct < 1) || (mn === mx)) {

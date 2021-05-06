@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <math.h>
+#include <float.h>
 
-int nifti_robust_range(double* img, int nvox, double* pct2, double * pct98, double*  mn0, double* mx1,  int ignoreZeroVoxels) {
+int nifti_robust_range(float* img, int nvox, float* pct2, float * pct98, float*  mn0, float* mx1,  int ignoreZeroVoxels) {
 //https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=fsl;31f309c1.1307
 // robust range is essentially the 2nd and 98th percentiles
 // "but ensuring that the majority of the intensity range is captured, even for binary images." 
@@ -15,8 +16,8 @@ int nifti_robust_range(double* img, int nvox, double* pct2, double * pct98, doub
 	*mn0 = 0.0;
 	*mx1 = 1.0;
 	if (nvox < 1) return 1;
-	double mn = INFINITY;
-	double mx = -INFINITY;
+	float mn = INFINITY;
+	float mx = -INFINITY;
 	size_t nZero = 0;
 	size_t nNan = 0;
 	for (size_t i = 0; i < nvox; i++ ) {
@@ -28,10 +29,8 @@ int nifti_robust_range(double* img, int nvox, double* pct2, double * pct98, doub
 			nZero++;
 			if (ignoreZeroVoxels) continue;
 		}
-		// mn = fmin(img[i],mn);
-		if(img[i] < mn) mn = img[i];
-		// mx = fmax(img[i],mx);
-		if(img[i] > mx) mx = img[i];
+		mn = fmin(img[i],mn);
+		mx = fmax(img[i],mx);
 	}
 	*mn0 = mn;
 	*mx1 = mx;
@@ -54,7 +53,7 @@ int nifti_robust_range(double* img, int nvox, double* pct2, double * pct98, doub
 		return 0;
 	}
 	#define nBins 1001 
-	double scl = (nBins-1)/(mx-mn);
+	float scl = (nBins-1)/(mx-mn);
 	int hist[nBins];
 	for (int i = 0; i < nBins; i++ )
 		hist[i] = 0;
@@ -102,9 +101,9 @@ int nifti_robust_range(double* img, int nvox, double* pct2, double * pct98, doub
 	return 0;
 }
 
-double* robust_range(double* img, int nvox) {
-	static double ret[4];
-	double pct2, pct98, mn, mx;
+float* robust_range(float* img, int nvox) {
+	static float ret[4];
+	float pct2, pct98, mn, mx;
 	nifti_robust_range(img, nvox, &pct2, &pct98, &mn, &mx, 0);
 	ret[0] = pct2;
 	ret[1] = pct98;
