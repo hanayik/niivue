@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@mdi/font": "^5.9.55",
+    "@niivue/niivue": "^0.1.2",
     "core-js": "^3.6.5",
     "gl-matrix": "^3.3.0",
     "hammerjs": "^2.0.8",
