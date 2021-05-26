@@ -37,7 +37,7 @@
                 :min="overlay.intensityMin"
                 hide-details
                 class="align-center"
-
+                @input="onIntensitySliderChange(i, [overlay.intensityRange[0], overlay.intensityRange[1]])"
               >
                 <template v-slot:prepend>
                   <v-text-field
@@ -45,9 +45,10 @@
                     class="mt-0 pt-0"
                     hide-details
                     single-line
-                    type="number"
+                    type="text"
+                    readonly
                     style="width: 60px"
-                    @input="$set(overlay.intensityRange, 0, $event)"
+                    @input="onIntensity0Change(i, overlay.intensityRange[0])"
                   ></v-text-field>
                 </template>
                 <template v-slot:append>
@@ -56,9 +57,10 @@
                     class="mt-0 pt-0"
                     hide-details
                     single-line
-                    type="number"
+                    type="text"
+                    readonly
                     style="width: 60px"
-                    @input="$set(overlay.intensityRange, 1, $event)"
+                    @input="onIntensity1Change(i, overlay.intensityRange[1])"
                   ></v-text-field>
                 </template>
               </v-range-slider>
@@ -142,8 +144,7 @@ export default {
       return val ? 'mdi-eye' : 'mdi-eye-off';
     },
 
-    onColorChange: function(i) {
-      console.log(i)
+    onColorChange: function() {
       bus.$emit('colormap-change');
 
     },
@@ -153,10 +154,33 @@ export default {
 
     },
 
+    onIntensity0Change: function(i, newVal) {
+      bus.$emit('intensity-change', {volIdx:i, newRangeArr:[newVal, this.overlays[i].intensityMax]});
+    },
+
+    onIntensity1Change: function(i, newVal) {
+      bus.$emit('intensity-change', {volIdx:i, newRangeArr:[this.overlays[i].intensityMin, newVal]});
+    },
+
+    onIntensitySliderChange: function(i, newRangeArr) {
+      bus.$emit('intensity-change', {volIdx:i, newRangeArr:newRangeArr});
+    },
+    
+
     onAddOverlay: function () {
       alert('adding overlays in this demo is not implemented yet! :)')
     },
 
+  },
+
+  mounted() {
+    bus.$on('intensity-range-update', (intensity) => {
+      // console.log(intensity)
+      this.overlays[intensity.volIdx].intensityMin = intensity.newRangeArr[0]
+      this.overlays[intensity.volIdx].intensityMax = intensity.newRangeArr[1]
+      this.overlays[intensity.volIdx].intensityRange = intensity.newRangeArr
+      this.$forceUpdate()
+    });
   }
 
 };

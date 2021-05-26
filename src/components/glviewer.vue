@@ -21,8 +21,9 @@
   </div>
 </template>
 <script>
-import * as Hammer from 'hammerjs';
-import {Niivue} from "../niivue.js";
+// import * as Hammer from 'hammerjs';
+// import {Niivue} from "../niivue.js";
+import {Niivue} from '@niivue/niivue'
 import {bus} from "@/bus.js"
 
 
@@ -38,8 +39,6 @@ export default {
   },
   created () {
     
-
-
   },
   
   data() {
@@ -61,19 +60,19 @@ export default {
 
     };
   },
-  watch: {
-    // watch for changes to hdr property of volume object
-    // this detects changes from hdr=null to hdr=real_data
-    overlays: {
-      deep: true,
-      handler () {
-        //nv.selectColormap(this.gl, this.overlays[this.selectedOverlay].colorMap)
-        //nv.updateGLVolume(this.gl, this.overlays[this.selectedOverlay])
-    },
+  // watch: {
+  //   // watch for changes to hdr property of volume object
+  //   // this detects changes from hdr=null to hdr=real_data
+  //   overlays: {
+  //     deep: true,
+  //     handler () {
+  //       //nv.selectColormap(this.gl, this.overlays[this.selectedOverlay].colorMap)
+  //       //nv.updateGLVolume(this.gl, this.overlays[this.selectedOverlay])
+  //   },
 
-    }
+  //   }
     
-      },
+  //     },
   methods: {
     setNewPos: function(){
       let newMM = this.niivue.frac2mm([this.niivue.scene.crosshairPos[0],this.niivue.scene.crosshairPos[1],this.niivue.scene.crosshairPos[2]]); 
@@ -111,155 +110,37 @@ export default {
     glEl.width = viewer.clientWidth//viewer.offsetWidth-1
     glEl.height = viewer.clientHeight//viewer.offsetHeight-1
     viewer.appendChild(glEl)
-    const canvas = document.querySelector("#gl");
-    const gl = canvas.getContext("webgl2");
-    if (!gl) {
-      if (typeof(WebGL2RenderingContext) !== 'undefined') {
-        alert('your browser appears to support WebGL2 but it might be disabled. Niivue might not work');
-      } else {
-        alert('your browser has no WebGL2 support, Niivue will not work! If you are using safari, you can enable the developer menu and activate the WebGL2 item under experimental features.');
-      }
-    } else {
-      console.log('webgl2 works!');
+
+    this.niivue = new Niivue({}).attachTo('gl')
+    this.niivue.resizeListener = this.onWindowResize
+    window.addEventListener('resize', this.niivue.resizeListener.bind(this)) 
+    
+    this.niivue.loadVolumes(this.overlays) // pass in all overlays (an array)
+
+    setTimeout(() => {
+      for (var i=0; i<this.overlays.length; i++){
+      console.log('intensity-range-update')
+      console.log(this.overlays[i].cal_max)
+      // console.log(this.overlays[i].cal_max)
+      this.overlays[i].intensityRange = [this.overlays[i].cal_min, this.overlays[i].cal_max]
+      var intensityRange = [this.overlays[i].cal_min, this.overlays[i].cal_max]
+      console.log(this.overlays[i].intensityRange)
+      bus.$emit('intensity-range-update', {volIdx:i, newRangeArr:intensityRange});
     }
-
-    var gc = new Hammer(canvas); // gesture controller
-    gc.get('press').set({ time: 2000 });
-    gc.get('pinch').set({ enable: true });
-
-    gl.canvas.addEventListener('mousedown', (e) => {
-      e.preventDefault()
-      this.dialog = false
-      this.mouseDown = true
-      var rect = canvas.getBoundingClientRect()
-      this.niivue.mouseClick(e.clientX - rect.left, e.clientY - rect.top)
-      this.niivue.mouseDown(e.clientX - rect.left,e.clientY - rect.top)
-      this.setNewPos()
-    })
+    // bus.$emit('intensity-range-update');
+    }, 3000);
+    console.log('blah')
     
-    gl.canvas.addEventListener('touchstart', (e) => {
-      e.preventDefault()
-      this.dialog = false
-      this.touchDown = true
-      var rect = canvas.getBoundingClientRect()
-      this.niivue.mouseClick(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
-      this.niivue.mouseDown(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
-      this.setNewPos()
-    })
-
     
-    gl.canvas.addEventListener('mousemove', (e) => {
-      if (this.mouseDown) {
-        var rect = canvas.getBoundingClientRect()
-        // mouseClick if any 2D mode
-        this.niivue.mouseClick(e.clientX - rect.left, e.clientY - rect.top)
-        // mouseMove if 3D render mode
-        this.niivue.mouseMove(e.clientX - rect.left,e.clientY - rect.top)
-        this.setNewPos()
-      }
-    })
-
-    gl.canvas.addEventListener('touchmove', (e) => {
-      if (this.touchDown && e.touches.length < 2) {
-        var rect = canvas.getBoundingClientRect()
-        this.niivue.mouseClick(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
-        this.niivue.mouseMove(e.touches[0].clientX - rect.left,e.touches[0].clientY - rect.top)
-        this.setNewPos()
-      }
-    })
-
-
-    gc.on('pinchin', () => {
-      // scroll 2D slices 
-      this.niivue.sliceScroll2D(0.001, null, null)
-      this.setNewPos()
-    })
-
-    gc.on('pinchout', () => {
-      // scroll 2D slices 
-      this.niivue.sliceScroll2D(-0.001, null, null)
-      this.setNewPos()
-    })
-
-    gl.canvas.addEventListener('wheel', (e) => {
-      if (this.zDown) {
-        e.preventDefault()
-        this.scale += e.deltaY * -0.01
-        this.niivue.setScale(this.scale)
-      } else {
-        // scroll 2D slices 
-        e.preventDefault()
-        e.stopPropagation()
-        var rect = canvas.getBoundingClientRect()
-        if (e.deltaY < 0){
-          this.niivue.sliceScroll2D(-0.01, e.clientX - rect.left, e.clientY - rect.top)
-        } else {
-          this.niivue.sliceScroll2D(0.01, e.clientX - rect.left, e.clientY - rect.top)
-        }
-        this.setNewPos()
-        
-      }
-    })
-
-    gc.on('press', () => {
-      this.dialog = true
-    })
-
-    gl.canvas.addEventListener('mouseup', () => {
-      this.mouseDown = false
-    })
-
-    gl.canvas.addEventListener('tocuhend', () => {
-      this.touchDown = false
-    })
-
-
-    window.addEventListener('keypress', (e) => {
-      if (e.key === 'z') {
-        this.zDown = true
-      }
-      if (e.key === 'd') {
-        this.discoMode = this.discoMode == false ? true: false
-        clearInterval(this.discoModeColorMapTimer)
-        clearInterval(this.discoModeCrosshairTimer)
-        if (this.discoMode) {
-          this.discoModeColorMapTimer = setInterval(
-            () => {
-              bus.$emit('colormap-change', this.colorMaps[Math.floor(Math.random() * this.colorMaps.length)]);
-
-            }, 200)
-          this.discoModeCrosshairTimer = setInterval(
-            function () {
-              this.niivue.setCrosshairColor([Math.random(), Math.random(), Math.random(), 1])
-            }, 200)
-        } else {
-          bus.$emit('colormap-change', "gray");
-          this.niivue.setCrosshairColor([1, 0, 0, 1])
-
-        }
-      }
-
-    })
-
-    window.addEventListener('keyup', (e) => {
-      if (e.key === 'z') {
-        this.zDown = false
-      }
-    })
-
-    window.addEventListener('resize', this.onWindowResize)
-
-    this.niivue = new Niivue({}).attachTo('#gl')
-
-    this.gl = gl;
-    
-    this.niivue.loadVolumes(this.overlays); // pass in all overlays (an array)
-   
-    // opacity is an object with properties:
-    // int:   volIdx        The index of the volume being changed in the array of volumes
-    // float: newOpacity    This new Opacity to set for that volume
     bus.$on('opacity-change', (opacity) => {
       this.niivue.setOpacity(opacity.volIdx, opacity.newOpacity)
+    });
+
+    bus.$on('intensity-change', (intensity) => {
+      // this.niivue.setOpacity(intensity.volIdx, intensity.newRangeArr)
+      this.overlays[intensity.volIdx].cal_min = intensity.newRangeArr[0] 
+      this.overlays[intensity.volIdx].cal_max = intensity.newRangeArr[1] 
+      this.niivue.updateGLVolume(this.overlays);
     });
 
     bus.$on('slice-type-change', function (sliceType) {
